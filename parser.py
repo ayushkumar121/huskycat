@@ -28,7 +28,7 @@ def parse_program_from_file(file_path) -> Program:
     with open(file_path) as file:
 
         for line_num, line in enumerate(re.split("[\n]", file.read())):
-            line = line.split("//")[0]
+            line = line.split("//")[0].strip()
 
             # Matching an assignment
             if re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*[ ]*=[ ]*[a-zA-Z0-9+\-/%()]+", line):
