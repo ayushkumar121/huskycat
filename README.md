@@ -10,4 +10,4 @@ Husky cat is a progarmming language
 [.] Turning Complete
 [.] Easy to use
 [.] Compiled
-[.] Self Hosted  
+[.] Interpreted
