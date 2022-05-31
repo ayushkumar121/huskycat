@@ -2,12 +2,12 @@
 
 > **Work in Progress**
 
-Husky cat is a progarmming language based on object oriented principles.
-Primarly for designing userinterfaces and video game design
+Husky cat is a progarmming language
 
 
 ## Goals
 ---
-[x] Fullfil basic OOP    
-[x] Self Hosted  
-[x] 
+[.] Turning Complete
+[.] Easy to use
+[.] Compiled
+[.] Self Hosted  
