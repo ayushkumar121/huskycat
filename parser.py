@@ -31,11 +31,11 @@ def parse_program_from_file(file_path) -> Program:
             line = line.split("//")[0]
 
             # Matching an assignment
-            if re.match("[a-zA-Z][a-zA-Z0-9_]*[ ]*=[ ]*[a-zA-Z0-9+\-/%()]+", line):
+            if re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*[ ]*=[ ]*[a-zA-Z0-9+\-/%()]+", line):
                 tokens = re.split("[ ]*=[ ]*", line)
 
                 if len(tokens) > 2:
-                    print(f"{file_path}:{line_num}:")
+                    print(f"{file_path}:{line_num + 1}:")
                     print(
                         "Parsing Error: muliple '=' found on right side of the argument")
                     exit(1)
@@ -45,7 +45,7 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpVarAssign, left_side, right_side))
                 pass
-            elif re.match("print[ ]*[a-zA-Z][a-zA-Z0-9_]*", line):
+            elif re.fullmatch("print[ ]*[a-zA-Z][a-zA-Z0-9_]*", line):
                 tokens = re.split("[ ]+", line)
 
                 if len(tokens) != 2:
@@ -55,7 +55,7 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpPrintVar, tokens[1], ""))
             else:
-                print(f"{file_path}:{line_num}:")
+                print(f"{file_path}:{line_num + 1}:")
                 print("Parsing Error: unexpected token")
                 exit(1)
 
