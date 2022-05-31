@@ -182,13 +182,28 @@ for line in expressions:
 
             val = evaluate_stack(eval_stack)
 
-            print(eval_stack, val)
             if (left_side not in symbol_table.keys()) or symbol_table[left_side].type == DataType.Int:
                 symbol_table[left_side] = Symbol(
                     left_side, DataType.Int, val, __file__, 0, 0)
             else:
                 print("Parsing Error : redefinition of variable not allowed")
                 exit(1)
+    elif re.match("print[ ]*[a-zA-Z][a-zA-Z0-9_]*", line):
+        tokens = re.split("[ ]+", line)
+        
+        if len(tokens) != 2:
+            print("Parsing Error : exactly one token is required after print")
+            exit(1)    
+
+        variable_name = tokens[1]
+
+        
+        if variable_name in symbol_table.keys():
+            print(symbol_table[variable_name].value)
+        else:
+            print(f"Parsing Error : cannot print unknown symbol `${variable_name}`")
+            exit(1)
+
     else:
         # TODO: match every expression exhaustively
         pass
