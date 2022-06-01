@@ -1,3 +1,4 @@
+from ast import Str
 from dataclasses import dataclass
 from typing import List
 from parser import DataType, OpType, Program
@@ -7,6 +8,7 @@ from parser import DataType, OpType, Program
 class Symbol:
     name: str
     value: int
+    type: DataType
 
 
 def predence(operator: str) -> int:
@@ -61,22 +63,24 @@ def evaluate_stack(eval_stack: List[int | str]) -> int:
 
         value_stack.append(apply_op(a, b, op))
 
-    return int(value_stack[0])
+    return value_stack[0]
 
 
 def interpret_program(program: Program):
     symbol_table = {}
 
     for op in program.operations:
+
         # Handling string literals
-        if op.type == OpType.OpVarAssign and op.data_type == DataType.Str:
+        if op.op_type == OpType.OpVarAssign and op.data_type == DataType.Str:
             left_side = op.name
             right_side = op.value
 
             symbol_table[left_side] = Symbol(
-                left_side, right_side)
+                left_side, right_side, DataType.Str)
+
         # Handling a mathetical expression
-        elif op.type == OpType.OpVarAssign and op.data_type == DataType.Int:
+        elif op.op_type == OpType.OpVarAssign:
 
             left_side = op.name
             right_side = op.value
@@ -89,6 +93,7 @@ def interpret_program(program: Program):
 
             evaluating_literal = False
             evaluating_variable = False
+            evaluating_str_literal = False
 
             right_side = "$" + right_side
 
@@ -110,7 +115,14 @@ def interpret_program(program: Program):
                         eval_stack.append(num_literal)
                     elif evaluating_variable:
                         if var_name in symbol_table.keys():
-                            eval_stack.append(symbol_table[var_name].value)
+                            if symbol_table[var_name] == DataType.Str:
+                                print(
+                                    f"{op.file_path}:{op.line_num}:")
+                                print(
+                                    f"Interpretation Error : string airethmatic is not allowed")
+                                exit(1)
+                            else:
+                                eval_stack.append(symbol_table[var_name].value)
                         else:
                             print(
                                 f"{op.file_path}:{op.line_num}:")
@@ -131,6 +143,8 @@ def interpret_program(program: Program):
                         eval_stack.append(num_literal)
                     elif evaluating_variable:
                         if var_name in symbol_table.keys():
+                            if symbol_table[var_name] == DataType.Str:
+                                evaluating_str_literal = True
                             eval_stack.append(symbol_table[var_name].value)
                         else:
                             print(
@@ -151,13 +165,16 @@ def interpret_program(program: Program):
                     exit(1)
 
             val = evaluate_stack(eval_stack)
+            type = DataType.Str if evaluating_str_literal else DataType.Int
+
             symbol_table[left_side] = Symbol(
-                left_side, val)
-        elif op.type == OpType.OpPrintVar:
+                left_side, val, type)
+
+        elif op.op_type == OpType.OpPrintVar:
             if op.name in symbol_table.keys():
                 print(symbol_table[op.name].value)
             else:
                 print(f"{op.file_path}:{op.line_num}:")
                 print(
-                    f"Interpretation Error : cannot print unknown symbol `{op.name}`")
+                    f"  Interpretation Error : cannot print unknown symbol `{op.name}`")
                 exit(1)

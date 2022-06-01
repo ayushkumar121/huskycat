@@ -19,6 +19,7 @@ def main() -> int:
     if len(sys.argv) < 2:
         print_help()
         print("Error: No command line arguments were provided")
+        return 1
     
     if sys.argv[1] == "help":
         print_help()

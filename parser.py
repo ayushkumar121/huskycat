@@ -18,11 +18,11 @@ class OpType(Enum):
 
 @dataclass
 class Operation:
-    type: OpType
+    op_type: OpType
     name: str
     value: str
     data_type: DataType
-    file: str
+    file_path: str
     line_num: int
 
 
@@ -74,7 +74,7 @@ def parse_program_from_file(file_path) -> Program:
                 right_side = tokens[1]
 
                 program.operations.append(
-                    Operation(OpType.OpVarAssign, left_side, right_side, DataType.Int, file_path, line_num))
+                    Operation(OpType.OpVarAssign, left_side, right_side, DataType.Nil, file_path, line_num))
             elif re.fullmatch("print[ ]*[a-zA-Z][a-zA-Z0-9_]*", line):
                 tokens = re.split("[ ]+", line)
 
