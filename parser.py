@@ -13,6 +13,7 @@ class DataType(Enum):
 
 class OpType(Enum):
     OpVarAssign = auto()
+    OpCallStack = auto()
     OpPrintVar = auto()
 
 
