@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from parser import OpType, Program
+from parser import DataType, OpType, Program
 
 
 @dataclass
@@ -68,7 +68,15 @@ def interpret_program(program: Program):
     symbol_table = {}
 
     for op in program.operations:
-        if op.type == OpType.OpVarAssign:
+        # Handling string literals
+        if op.type == OpType.OpVarAssign and op.data_type == DataType.Str:
+            left_side = op.name
+            right_side = op.value
+
+            symbol_table[left_side] = Symbol(
+                left_side, right_side)
+        # Handling a mathetical expression
+        elif op.type == OpType.OpVarAssign and op.data_type == DataType.Int:
 
             left_side = op.name
             right_side = op.value
@@ -104,6 +112,8 @@ def interpret_program(program: Program):
                         if var_name in symbol_table.keys():
                             eval_stack.append(symbol_table[var_name].value)
                         else:
+                            print(
+                                f"{op.file_path}:{op.line_num}:")
                             print(
                                 f"Interpretation Error : unrecognised symbol varible `{var_name}` during eval")
                             exit(1)
@@ -143,11 +153,11 @@ def interpret_program(program: Program):
             val = evaluate_stack(eval_stack)
             symbol_table[left_side] = Symbol(
                 left_side, val)
-            pass
         elif op.type == OpType.OpPrintVar:
             if op.name in symbol_table.keys():
                 print(symbol_table[op.name].value)
             else:
+                print(f"{op.file_path}:{op.line_num}:")
                 print(
-                    f"Interpretation Error : cannot print unknown symbol `${op.name}`")
+                    f"Interpretation Error : cannot print unknown symbol `{op.name}`")
                 exit(1)
