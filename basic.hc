@@ -1,12 +1,4 @@
-str="Hello world" // string support hurray 
-print str
+a:abc=10
+a=a+1
 
-z=str // string assignment
-print z
-
-a=10
-b=(a+2)/6-1 // ignoring comments
-c=8/2
-
-b=7+c+10
-print c
+print a 10 11
