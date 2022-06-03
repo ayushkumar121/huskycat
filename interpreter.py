@@ -1,8 +1,8 @@
-from ast import Str
 from dataclasses import dataclass
 from typing import List
 from misc import not_implemented
-from parser import OpType, Program
+from parser import OpType, Primitives, Program
+
 
 def predence(operator: str) -> int:
     if operator in "+-":
@@ -27,7 +27,7 @@ def apply_op(a: int, b: int, op: str) -> int:
     return 0
 
 
-def evaluate_stack(eval_stack: List[int | str]) -> int:
+def evaluate_stack(eval_stack: List[int | str], type_stack: List[Primitives]) -> tuple[List[int | str], List[Primitives]]:
     value_stack = []
     ops_stack = []
 
@@ -56,30 +56,83 @@ def evaluate_stack(eval_stack: List[int | str]) -> int:
 
         value_stack.append(apply_op(a, b, op))
 
-    return value_stack[0]
+    return value_stack, [Primitives.Int]
+
+
+@dataclass
+class Var:
+    name: str
+    type: Primitives
+    size: int
+    value: bytearray
+
+
+def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
+    for i, scope in enumerate(scopes[::-1]):
+        for j, v in enumerate(scope[::-1]):
+            if v.name == var:
+                return i, j
+
+    return -1, -1
 
 
 def interpret_program(program: Program):
-    type_stack = []
-    value_stack = []
-    symbol_stack = []
+    type_stack: List[Primitives] = []
+    value_stack: List[int | str] = []
+
+    scopes: List[List[Var]] = []
 
     for op in program.operations:
 
         if op.type == OpType.OpBeginScope:
+            vars = []
+            for i, var in enumerate(op.oprands):
+                vars.append(Var(var, op.types[i], 8, bytearray(8)))
+            scopes.append(vars)
 
-            pass
-
-        if op.type == OpType.OpEndScope:
-            pass
+        elif op.type == OpType.OpEndScope:
+            scopes.pop()
 
         elif op.type == OpType.OpPush:
-            pass
+            while len(op.oprands) > 0:
+                val_or_var = op.oprands.pop()
+                type = op.types.pop()
+
+                i, j = find_var_scope(val_or_var, scopes)
+                if i != -1:
+                    value_stack.append(int.from_bytes(scopes[i][j].value, "big"))
+                else:
+                    value_stack.append(val_or_var)
+
+                type_stack.append(type)
 
         elif op.type == OpType.OpMov:
-            pass
+            var = op.oprands.pop()
+            type = op.types.pop()
+
+            value_stack, type_stack = evaluate_stack(value_stack, type_stack)
+            i, j = find_var_scope(var, scopes)
+
+            # TODO: perform typechecking
+
+            if i != -1:
+                scopes[i][j].value = int(value_stack.pop()).to_bytes(4, "big", signed=True)
+            else:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Interpreter Error : error evaluating expression")
+                exit(1)
 
         elif op.type == OpType.OpPrint:
-            pass
-    
-    not_implemented()
+            to_print = []
+            while len(op.oprands) > 0:
+                val_or_var = op.oprands.pop()
+                type = op.types.pop()
+
+                i, j = find_var_scope(val_or_var, scopes)
+                if i != -1:
+                    to_print.append(int.from_bytes(scopes[i][j].value, "big", signed=True))
+                else:
+                    to_print.append(val_or_var)
+
+            print(tuple(to_print[::-1]))

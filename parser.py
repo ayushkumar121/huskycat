@@ -27,9 +27,6 @@ class OpType(Enum):
     # Push oprands to stack
     OpPush = auto()
 
-    # Evaluates what is on top of the stack
-    OpEval = auto()
-
     # Assignment and evalution of whatever is on the stack
     OpMov = auto()
 
@@ -187,14 +184,15 @@ def match_primitives(primitive: str) -> Primitives:
     return Primitives.Unknown
 
 
-def get_symbol_types(symbols: List[str], program:Program) -> List[Primitives]:
+def get_symbol_types(symbols: List[str], program:Program) -> tuple[List[int|str], List[Primitives]]:
     primitives = []
 
-    for symbol in symbols:
+    for i, symbol in enumerate(symbols):
     
         _, is_int_literal = parse_int_liternal(symbol)
         
         if is_int_literal:
+            symbols[i] = int(symbol)
             primitives.append(Primitives.Int)
             continue
 
@@ -206,7 +204,7 @@ def get_symbol_types(symbols: List[str], program:Program) -> List[Primitives]:
         
         primitives.append(Primitives.Unknown)
 
-    return primitives
+    return symbols, primitives
 
 
 def parse_program_from_file(file_path) -> Program:
@@ -289,7 +287,7 @@ def parse_program_from_file(file_path) -> Program:
                 tokens = re.split(" ", line)
                 tokens.pop(0)
 
-                types = get_symbol_types(tokens, program)
+                tokens, types = get_symbol_types(tokens, program)
 
                 if Primitives.Unknown in types:
                     index = types.index(Primitives.Unknown)
@@ -313,8 +311,5 @@ def parse_program_from_file(file_path) -> Program:
         # End the global scope
         program.operations.append(
             Operation(OpType.OpEndScope, file_path, len(lines), [], []))
-
-    for op in program.operations:
-        print(f"{op.file}:{op.line}:", op.type, op.oprands, op.types)
 
     return program

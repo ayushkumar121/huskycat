@@ -1,3 +1,4 @@
+from ctypes import c_char
 from dataclasses import dataclass
 from parser import Program
 
@@ -23,5 +24,8 @@ char *data;
 
 int main() {
 """
+    
+
+    c_code += "}"
 
     return c_code
