@@ -1,5 +1,5 @@
 // Datatypes: int (signed 64bit)
-a:i32=10+1
+a:i64=10+1
 // ^ we need compile time evaluation for this
 
 a=a+1

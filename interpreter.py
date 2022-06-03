@@ -20,7 +20,7 @@ def size_of(primitive: Primitives) -> int:
     elif primitive == Primitives.F32:
         return 4
     elif primitive == Primitives.F64:
-        return 8 
+        return 8
     elif primitive == Primitives.Bool:
         return 1
 
@@ -155,7 +155,9 @@ def interpret_program(program: Program):
                     val = int.from_bytes(
                         scopes[i][j].value, "big", signed=True)
 
-                if type == Primitives.I64:
-                    print(val)
+                if type in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
+                    print(val, end=" ")
                 elif type == Primitives.Bool:
-                    print("true" if val == 1 else "false")
+                    print("true" if val == 1 else "false", end=" ")
+
+            print()

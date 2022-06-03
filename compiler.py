@@ -34,13 +34,13 @@ int len;
 char *data;
 } Str;
 
-void print_i32(i32 a) {printf(\"%d\\n\", a);}
-void print_i64(i64 a) {printf(\"%lld\\n\", a);}
+void print_i32(i32 a) {printf(\"%d \", a);}
+void print_i64(i64 a) {printf(\"%lld \", a);}
 
-void print_f32(f32 a) {printf(\"%f\\n\", a);}
-void print_f64(f64 a) {printf(\"%lf\\n\", a);}
+void print_f32(f32 a) {printf(\"%f \", a);}
+void print_f64(f64 a) {printf(\"%lf \", a);}
 
-void print_bool(bool a) {printf(\"%s\\n\", a?"true":"false");}
+void print_bool(bool a) {printf(\"%s \", a?"true":"false");}
 
 int main() {
 """
@@ -112,6 +112,9 @@ int main() {
                     print(
                         f"Compiler Error : print is not defined for following type")
                     exit(1)
+
+            c_code += f"printf(\"\\n\");\n"
+            
 
     c_code += """
 return 0;
