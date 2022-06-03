@@ -15,19 +15,32 @@ def compiler_program(program: Program) -> str:
 
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
-    
+
     # TODO: make the source code statically linked
 
     c_code = """
 # include<stdio.h>
 
-typedef long long int i64;
+typedef int i32;
+typedef long long i64;
+
+typedef float f32;
+typedef double f64;
+
 typedef unsigned char bool;
 
 typedef struct{
 int len;
 char *data;
 } Str;
+
+void print_i32(i32 a) {printf(\"%d\\n\", a);}
+void print_i64(i64 a) {printf(\"%lld\\n\", a);}
+
+void print_f32(f32 a) {printf(\"%f\\n\", a);}
+void print_f64(f64 a) {printf(\"%lf\\n\", a);}
+
+void print_bool(bool a) {printf(\"%s\\n\", a?"true":"false");}
 
 int main() {
 """
@@ -40,11 +53,22 @@ int main() {
                 var = op.oprands.pop()
                 type = op.types.pop()
 
-                if type == Primitives.Int:
+                if type == Primitives.I32:
+                    c_code += f"i32 {var};\n"
+                elif type == Primitives.I64:
                     c_code += f"i64 {var};\n"
+                elif type == Primitives.F32:
+                    c_code += f"f32 {var};\n"
+                elif type == Primitives.F64:
+                    c_code += f"f64 {var};\n"
                 elif type == Primitives.Bool:
                     c_code += f"bool {var};\n"
-            
+                else:
+                    print(f"{op.file}:{op.line}:")
+                    print(
+                        f"Compiler Error : type not defined for compilation")
+                    exit(1)
+
         elif op.type == OpType.OpEndScope:
             c_code += "}"
 
@@ -73,10 +97,22 @@ int main() {
                 type = op.types[i]
 
                 # different print for different type
-                if type ==  Primitives.Int:
-                    c_code += f"printf(\"%lld\\n\", {val_or_var});\n"
-                elif type ==  Primitives.Bool:
-                    c_code += f"printf(\"%s\\n\", {val_or_var}?\"true\":\"false\");\n"
+                if type == Primitives.I32:
+                    c_code += f"print_i32({val_or_var});\n"
+                elif type == Primitives.I64:
+                    c_code += f"print_i64({val_or_var});\n"
+                elif type == Primitives.F32:
+                    c_code += f"print_f32({val_or_var});\n"
+                elif type == Primitives.F64:
+                    c_code += f"print_f64({val_or_var});\n"
+                elif type == Primitives.Bool:
+                    c_code += f"print_bool({val_or_var});\n"
+                else:
+                    print(f"{op.file}:{op.line}:")
+                    print(
+                        f"Compiler Error : print is not defined for following type")
+                    exit(1)
+
     c_code += """
 return 0;
 }

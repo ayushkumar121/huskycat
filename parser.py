@@ -9,9 +9,11 @@ from misc import not_implemented
 
 
 class Primitives(Enum):
-    Int = auto()
+    I32 = auto()
+    I64 = auto()
+    F32 = auto()
+    F64 = auto()
     Bool = auto()
-    Float = auto()
     Struct = auto()
     Func = auto()
     Unknown = auto()
@@ -49,13 +51,18 @@ class Program:
     operations: List[Operation]
 
 
-def match_primitives(primitive: str) -> Primitives:
-    if primitive == "int":
-        return Primitives.Int
+def parse_primitives(primitive: str) -> Primitives:
+    if primitive == "i32":
+        return Primitives.I32
+    elif primitive == "i64":
+        return Primitives.I64
+    elif primitive == "f32":
+        return Primitives.F32
+    elif primitive == "f64":
+        return Primitives.F64
     elif primitive == "bool":
         return Primitives.Bool
-    elif primitive == "float":
-        return Primitives.Float
+
 
     return Primitives.Unknown
 
@@ -140,7 +147,7 @@ def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primit
         elif ch in "+-/*%()":
             if evaluating_int:
                 eval_stack.append(num)
-                type_stack.append(Primitives.Int)
+                type_stack.append(Primitives.I64)
             elif evaluating_words:
                 op_index, p_index = find_scope_with_symbol(name, program)
                 what_bool, is_bool = parse_bool_literal(name)
@@ -171,12 +178,12 @@ def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primit
 
             eval_stack.append(ch)
             # Maybe different types for different operator
-            type_stack.append(Primitives.Int)
+            type_stack.append(Primitives.I64)
 
         elif ch == "$":
             if evaluating_int:
                 eval_stack.append(num)
-                type_stack.append(Primitives.Int)
+                type_stack.append(Primitives.I64)
             elif evaluating_words:
                 op_index, p_index = find_scope_with_symbol(name, program)
                 what_bool, is_bool = parse_bool_literal(name)
@@ -220,7 +227,7 @@ def get_symbol_types(symbols: List[str], program: Program) -> tuple[List[int | s
 
         if is_int_literal:
             symbols[i] = int(symbol)
-            primitives.append(Primitives.Int)
+            primitives.append(Primitives.I64)
             continue
 
         op_index, p_index = find_scope_with_symbol(symbol, program)
@@ -287,7 +294,7 @@ def parse_program_from_file(file_path) -> Program:
                             f"Parsing Error: expected type when declaring a variable")
                         exit(1)
 
-                    var_type = match_primitives(var_info[1])
+                    var_type = parse_primitives(var_info[1])
 
                     if var_type == Primitives.Unknown:
                         print(f"{file_path}:{line_num}:")

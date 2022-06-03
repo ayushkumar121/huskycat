@@ -1,11 +1,13 @@
 // Datatypes: int (signed 64bit)
-a:int=10
+a:i32=10+1
+// ^ we need compile time evaluation for this
+
 a=a+1
 
-b:int=7
+b:i64=7
 b=a-b
 
-print a b
+print a b // we use c printf for printing but we would need a custom function for this in the future
 
 // Datatypes: bool (8bit)
 c:bool=false
@@ -22,6 +24,6 @@ print c
 
 // Control flow
 
-// if ,,,,, { <-- 
+// if ,,,,, { <-- jump to label if false
 // 
 // } <-- end

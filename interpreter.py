@@ -13,12 +13,16 @@ class Var:
 
 
 def size_of(primitive: Primitives) -> int:
-    if primitive == Primitives.Int:
+    if primitive == Primitives.I32:
+        return 4
+    elif primitive == Primitives.I64:
         return 8
+    elif primitive == Primitives.F32:
+        return 4
+    elif primitive == Primitives.F64:
+        return 8 
     elif primitive == Primitives.Bool:
         return 1
-    elif primitive == Primitives.Float:
-        return 8
 
     return 0
 
@@ -76,7 +80,7 @@ def evaluate_stack(eval_stack: List[int | str],
 
         value_stack.append(apply_op(a, b, op))
 
-    return value_stack, [Primitives.Int]
+    return value_stack, [Primitives.I64]
 
 
 def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
@@ -102,7 +106,8 @@ def interpret_program(program: Program):
                 var = op.oprands.pop()
                 type = op.types.pop()
 
-                vars.append(Var(var, type, size_of(type), bytearray(size_of(type))))
+                vars.append(Var(var, type, size_of(
+                    type), bytearray(size_of(type))))
 
             scopes.append(vars)
 
@@ -150,7 +155,7 @@ def interpret_program(program: Program):
                     val = int.from_bytes(
                         scopes[i][j].value, "big", signed=True)
 
-                if type == Primitives.Int:
+                if type == Primitives.I64:
                     print(val)
                 elif type == Primitives.Bool:
                     print("true" if val == 1 else "false")
