@@ -2,11 +2,13 @@
 
 import subprocess
 import sys
+import copy
 
 from compiler import compiler_program
 from interpreter import interpret_program
 
 from parser import parse_program_from_file
+from typechecker import typecheck_program
 
 def print_help():
     print("./huskycat [command] [..file]")
@@ -30,6 +32,8 @@ def main() -> int:
             print("Error: No file path was provided")
         
         program = parse_program_from_file(sys.argv[2])
+        typecheck_program(copy.deepcopy(program))        
+
         interpret_program(program)
     
     if sys.argv[1] == "compile":
@@ -38,6 +42,8 @@ def main() -> int:
             print("Error: No file path was provided")
         
         program = parse_program_from_file(sys.argv[2])
+        typecheck_program(copy.deepcopy(program))        
+
         c_code = compiler_program(program)
 
         output_file = f"{sys.argv[2]}.c"

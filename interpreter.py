@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Type
 from misc import not_implemented
 from parser import OpType, Primitives, Program
 
@@ -119,8 +119,6 @@ def interpret_program(program: Program):
             value_stack, type_stack = evaluate_stack(value_stack, type_stack)
             i, j = find_var_scope(var, scopes)
 
-            # TODO: perform typechecking
-
             if i != -1:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     4, "big", signed=True)
@@ -135,10 +133,14 @@ def interpret_program(program: Program):
                 type = op.types[i]
 
                 i, j = find_var_scope(val_or_var, scopes)
+                val = val_or_var
+
                 if i != -1:
-                    print(int.from_bytes(
-                        scopes[i][j].value, "big", signed=True))
-                else:
-                    print(val_or_var)
-    
+                    val = int.from_bytes(
+                        scopes[i][j].value, "big", signed=True)
+
+                if type == Primitives.Int:
+                    print(val)
+                elif type == Primitives.Bool:
+                    print("true" if val == 1 else "false")
     

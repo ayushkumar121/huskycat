@@ -11,6 +11,7 @@ from misc import not_implemented
 class Primitives(Enum):
     Int = auto()
     Bool = auto()
+    Float = auto()
     Struct = auto()
     Func = auto()
     Unknown = auto()
@@ -48,6 +49,40 @@ class Program:
     operations: List[Operation]
 
 
+def match_primitives(primitive: str) -> Primitives:
+    if primitive == "int":
+        return Primitives.Int
+    elif primitive == "bool":
+        return Primitives.Bool
+    elif primitive == "float":
+        return Primitives.Float
+
+    return Primitives.Unknown
+
+
+def parse_int_liternal(symbol: str) -> tuple[int, bool]:
+    i = 1
+    num = 0
+
+    for d in symbol:
+        if not d.isdigit():
+            return 0,  False
+
+        num = num + int(d) * i
+        i = i * 10
+
+    return num, True
+
+
+def parse_bool_literal(symbol: str) -> tuple[int, bool]:
+    if symbol == "true":
+        return 1, True
+    elif symbol == "false":
+        return 0, True
+
+    return 0, False
+
+
 def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
     l = len(program.operations)
 
@@ -74,20 +109,6 @@ def find_local_scope(program: Program) -> int:
     return -1
 
 
-def parse_int_liternal(symbol: str) -> tuple[int, bool]:
-    i = 1
-    num = 0
-
-    for d in symbol:
-        if not d.isdigit():
-            return 0,  False
-
-        num = num + int(d) * i
-        i = i * 10
-
-    return num, True
-
-
 def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primitives]]:
     eval_stack = []
     type_stack = []
@@ -97,70 +118,85 @@ def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primit
     num = 0
     name = ""
 
-    evaluating_int_literal = False
-    evaluating_variable = False
+    evaluating_int = False
+    evaluating_words = False
 
     for ch in exp[::-1]:
 
-        if ch.isdigit() and not evaluating_variable:
+        if ch.isdigit() and not evaluating_words:
             num = num + int(ch) * i
             i = i * 10
-            evaluating_int_literal = True
+            evaluating_int = True
 
         elif ch.isalpha():
-            if evaluating_int_literal:
+            if evaluating_int:
                 name = ch + str(num)
             else:
                 name = ch + name
 
-                evaluating_int_literal = False
-                evaluating_variable = True
+                evaluating_int = False
+                evaluating_words = True
 
         elif ch in "+-/*%()":
-            if evaluating_int_literal:
+            if evaluating_int:
                 eval_stack.append(num)
                 type_stack.append(Primitives.Int)
-            elif evaluating_variable:
+            elif evaluating_words:
                 op_index, p_index = find_scope_with_symbol(name, program)
+                what_bool, is_bool = parse_bool_literal(name)
 
+                # Match variables
                 if op_index != -1:
                     type = program.operations[op_index].types[p_index]
                     eval_stack.append(name)
                     type_stack.append(type)
-                else:
-                    op = program.operations[op]
-                    print(
-                        f"{op.file_path}:{op.line_num}:")
-                    print(
-                        f"Parsing Error : unrecognised symbol varible `{name}`")
-                    exit(1)
 
-            i = 1
-            num = 0
-            name = ""
-            evaluating_int_literal = False
-            evaluating_variable = False
-
-            eval_stack.append(ch)
-            type_stack.append(Primitives.Func)
-
-        elif ch == "$":
-            if evaluating_int_literal:
-                eval_stack.append(num)
-                type_stack.append(Primitives.Int)
-            elif evaluating_variable:
-                op_index, p_index = find_scope_with_symbol(name, program)
-
-                if op_index != -1:
-                    type = program.operations[op_index].types[p_index]
-                    eval_stack.append(name)
-                    type_stack.append(type)
+                # Match bool literals
+                elif is_bool:
+                    eval_stack.append(what_bool)
+                    type_stack.append(Primitives.Bool)
                 else:
                     op = program.operations[op_index]
                     print(
                         f"{op.file}:{op.line}:")
                     print(
-                        f"Parsing Error : unrecognised symbol varible `{name}`")
+                        f"Parsing Error : unrecognised word `{name}`")
+                    exit(1)
+
+            i = 1
+            num = 0
+            name = ""
+            evaluating_int = False
+            evaluating_words = False
+
+            eval_stack.append(ch)
+            # Maybe different types for different operator
+            type_stack.append(Primitives.Int)
+
+        elif ch == "$":
+            if evaluating_int:
+                eval_stack.append(num)
+                type_stack.append(Primitives.Int)
+            elif evaluating_words:
+                op_index, p_index = find_scope_with_symbol(name, program)
+                what_bool, is_bool = parse_bool_literal(name)
+
+                # Match variables
+                if op_index != -1:
+                    type = program.operations[op_index].types[p_index]
+                    eval_stack.append(name)
+                    type_stack.append(type)
+
+                # Match bool literals
+                elif is_bool:
+                    eval_stack.append(what_bool)
+                    type_stack.append(Primitives.Bool)
+                else:
+                    op = program.operations[op_index]
+                    print(
+                        f"{op.file}:{op.line}:")
+                    print(
+                        f"Parsing Error : unrecognised word `{name}`")
                     exit(1)
             break
 
@@ -175,33 +211,24 @@ def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primit
     return eval_stack, type_stack
 
 
-def match_primitives(primitive: str) -> Primitives:
-    if primitive == "int":
-        return Primitives.Int
-    elif primitive == "bool":
-        return Primitives.Bool
-
-    return Primitives.Unknown
-
-
-def get_symbol_types(symbols: List[str], program:Program) -> tuple[List[int|str], List[Primitives]]:
+def get_symbol_types(symbols: List[str], program: Program) -> tuple[List[int | str], List[Primitives]]:
     primitives = []
 
     for i, symbol in enumerate(symbols):
-    
+
         _, is_int_literal = parse_int_liternal(symbol)
-        
+
         if is_int_literal:
             symbols[i] = int(symbol)
             primitives.append(Primitives.Int)
             continue
 
-        op_index,p_index = find_scope_with_symbol(symbol, program)
-        
+        op_index, p_index = find_scope_with_symbol(symbol, program)
+
         if op_index != -1:
             primitives.append(program.operations[op_index].types[p_index])
             continue
-        
+
         primitives.append(Primitives.Unknown)
 
     return symbols, primitives
@@ -272,6 +299,8 @@ def parse_program_from_file(file_path) -> Program:
                     program.operations[op_index].oprands.append(var_name)
                     program.operations[op_index].types.append(var_type)
                 else:
+                    # TODO: allow casting maybe?
+
                     if len(var_info) != 1:
                         print(f"{file_path}:{line_num}:")
                         print(
@@ -294,7 +323,7 @@ def parse_program_from_file(file_path) -> Program:
 
                     print(f"{file_path}:{line_num}:")
                     print(
-                            f"Parsing Error: unknown symbol {tokens[index]}")
+                        f"Parsing Error: unknown symbol {tokens[index]}")
                     exit(1)
 
                 program.operations.append(

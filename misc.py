@@ -1,3 +1,3 @@
-def not_implemented():
-    print("TODO: Not implemented")
+def not_implemented(message: str):
+    print(f"TODO: {message} not implemented")
     exit(1)

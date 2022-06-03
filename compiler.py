@@ -76,7 +76,7 @@ int main() {
                 if type ==  Primitives.Int:
                     c_code += f"printf(\"%lld\\n\", {val_or_var});\n"
                 elif type ==  Primitives.Bool:
-                    c_code += f"printf(\"%d\\n\", {val_or_var});\n"
+                    c_code += f"printf(\"%s\\n\", {val_or_var}?\"true\":\"false\");\n"
     c_code += """
 return 0;
 }
