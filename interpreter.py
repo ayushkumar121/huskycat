@@ -4,6 +4,25 @@ from misc import not_implemented
 from parser import OpType, Primitives, Program
 
 
+@dataclass
+class Var:
+    name: str
+    type: Primitives
+    size: int
+    value: bytearray
+
+
+def size_of(primitive: Primitives) -> int:
+    if primitive == Primitives.Int:
+        return 8
+    elif primitive == Primitives.Bool:
+        return 1
+    elif primitive == Primitives.Float:
+        return 8
+
+    return 0
+
+
 def predence(operator: str) -> int:
     if operator in "+-":
         return 1
@@ -60,14 +79,6 @@ def evaluate_stack(eval_stack: List[int | str],
     return value_stack, [Primitives.Int]
 
 
-@dataclass
-class Var:
-    name: str
-    type: Primitives
-    size: int
-    value: bytearray
-
-
 def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
     for i, scope in enumerate(scopes[::-1]):
         for j, v in enumerate(scope[::-1]):
@@ -91,7 +102,7 @@ def interpret_program(program: Program):
                 var = op.oprands.pop()
                 type = op.types.pop()
 
-                vars.append(Var(var, type, 8, bytearray(8)))
+                vars.append(Var(var, type, size_of(type), bytearray(size_of(type))))
 
             scopes.append(vars)
 
@@ -143,4 +154,3 @@ def interpret_program(program: Program):
                     print(val)
                 elif type == Primitives.Bool:
                     print("true" if val == 1 else "false")
-    

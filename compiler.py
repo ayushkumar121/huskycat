@@ -22,7 +22,7 @@ def compiler_program(program: Program) -> str:
 # include<stdio.h>
 
 typedef long long int i64;
-typedef int bool;
+typedef unsigned char bool;
 
 typedef struct{
 int len;
