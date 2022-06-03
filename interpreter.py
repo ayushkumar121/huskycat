@@ -27,7 +27,8 @@ def apply_op(a: int, b: int, op: str) -> int:
     return 0
 
 
-def evaluate_stack(eval_stack: List[int | str], type_stack: List[Primitives]) -> tuple[List[int | str], List[Primitives]]:
+def evaluate_stack(eval_stack: List[int | str],
+                   type_stack: List[Primitives]) -> tuple[List[int | str], List[Primitives]]:
     value_stack = []
     ops_stack = []
 
@@ -86,8 +87,12 @@ def interpret_program(program: Program):
 
         if op.type == OpType.OpBeginScope:
             vars = []
-            for i, var in enumerate(op.oprands):
-                vars.append(Var(var, op.types[i], 8, bytearray(8)))
+            while len(op.oprands) > 0:
+                var = op.oprands.pop()
+                type = op.types.pop()
+
+                vars.append(Var(var, type, 8, bytearray(8)))
+
             scopes.append(vars)
 
         elif op.type == OpType.OpEndScope:
@@ -100,7 +105,8 @@ def interpret_program(program: Program):
 
                 i, j = find_var_scope(val_or_var, scopes)
                 if i != -1:
-                    value_stack.append(int.from_bytes(scopes[i][j].value, "big"))
+                    value_stack.append(int.from_bytes(
+                        scopes[i][j].value, "big"))
                 else:
                     value_stack.append(val_or_var)
 
@@ -116,7 +122,8 @@ def interpret_program(program: Program):
             # TODO: perform typechecking
 
             if i != -1:
-                scopes[i][j].value = int(value_stack.pop()).to_bytes(4, "big", signed=True)
+                scopes[i][j].value = int(value_stack.pop()).to_bytes(
+                    4, "big", signed=True)
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -124,15 +131,14 @@ def interpret_program(program: Program):
                 exit(1)
 
         elif op.type == OpType.OpPrint:
-            to_print = []
-            while len(op.oprands) > 0:
-                val_or_var = op.oprands.pop()
-                type = op.types.pop()
+            for i, val_or_var in enumerate(op.oprands):
+                type = op.types[i]
 
                 i, j = find_var_scope(val_or_var, scopes)
                 if i != -1:
-                    to_print.append(int.from_bytes(scopes[i][j].value, "big", signed=True))
+                    print(int.from_bytes(
+                        scopes[i][j].value, "big", signed=True))
                 else:
-                    to_print.append(val_or_var)
-
-            print(tuple(to_print[::-1]))
+                    print(val_or_var)
+    
+    
