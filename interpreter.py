@@ -32,10 +32,12 @@ def predence(operator: str) -> int:
         return 1
     if operator in "*/":
         return 2
+    if operator in "!":
+        return 3
     return 0
 
 
-def apply_op_binary(a: int, b: int, op: str) -> int:
+def apply_op_binary(a: int, b: int, op: str) -> int | bool:
     if op == "+":
         return a + b
     elif op == "-":
@@ -52,48 +54,85 @@ def apply_op_binary(a: int, b: int, op: str) -> int:
         return a and b
     return 0
 
-def apply_op_uinary(a: int, op: str) -> int:
+
+def apply_op_uinary(a: int, op: str) -> int | bool:
     if op == "!":
-        return 1 if not a else 0
+        return not a
     return 0
 
 
-
-def evaluate_stack(eval_stack: List[int | str],
-                   type_stack: List[Primitives]) -> tuple[List[int | str], List[Primitives]]:
+def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[List[int], List[Primitives]]:
     value_stack = []
     ops_stack = []
 
-    for ch in eval_stack:
-        if str(ch) == ")":
-            ops_stack.append(ch)
-        elif str(ch) == "(":
-            while len(ops_stack) > 0 and ops_stack[-1] != ")":
+    for token in eval_stack:
+        if str(token) == "(":
+            ops_stack.append(token)
+
+        elif str(token) == ")":
+            while len(ops_stack) > 0 and ops_stack[-1] != "(":
                 a = value_stack.pop()
                 b = value_stack.pop()
 
                 op = ops_stack.pop()
 
                 value_stack.append(apply_op_binary(a, b, op))
-            ops_stack.pop()
-        elif str(ch) in "+-/*%!":
-            ops_stack.append(ch)
+
+            while len(ops_stack) > 0:
+                ops_stack.pop()
+
+        elif type(token) == type(0):
+            value_stack.append(token)
+
         else:
-            value_stack.append(ch)
+            while len(ops_stack) > 0 and predence(ops_stack[-1]) >= predence(token):
+                op = ops_stack.pop()
+
+                # Binary operators
+                if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
+                    a = value_stack.pop()
+                    b = value_stack.pop()
+
+                    value_stack.append(apply_op_binary(a, b, op))
+
+                # Uninary operators
+                elif op in "!":
+                    a = value_stack.pop()
+                    value_stack.append(apply_op_uinary(a, op))
+
+            ops_stack.append(token)
 
     while len(ops_stack) > 0:
         op = ops_stack.pop()
 
-        if op in "+-/*%":
+        # Binary operators
+        if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
             a = value_stack.pop()
             b = value_stack.pop()
 
             value_stack.append(apply_op_binary(a, b, op))
+
+        # Uninary operators
         elif op in "!":
             a = value_stack.pop()
             value_stack.append(apply_op_uinary(a, op))
 
-    return value_stack, [Primitives.I64]
+    if len(value_stack) != 1:
+        print(f"{file}:{line}:")
+        print(
+            f"Interpreter Error : error evaluating expression, eval_stack={eval_stack}")
+        exit(1)
+
+    val = value_stack.pop()
+    val_type = Primitives.Unknown
+
+    if type(val) == type(0):
+        val_type = Primitives.I64
+    elif type(val) == type(True):
+        val = 1 if val else 0
+        val_type = Primitives.Bool
+
+    return [val], [val_type]
 
 
 def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
@@ -145,7 +184,7 @@ def interpret_program(program: Program):
             var = op.oprands.pop()
             type = op.types.pop()
 
-            value_stack, type_stack = evaluate_stack(value_stack, type_stack)
+            value_stack, type_stack = evaluate_stack(value_stack, op.file, op.line)
             i, j = find_var_scope(var, scopes)
 
             if i != -1:

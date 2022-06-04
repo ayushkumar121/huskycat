@@ -1,7 +1,7 @@
 // Datatypes: i64
 // we also have a i32 type but i64 and i32 are not intercompatible rn
 
-a:i64= 10+1*2
+a:i64=10+1*2
 // ^ we need compile time evaluation for this
 
 a=a+1
@@ -20,7 +20,7 @@ c:bool=true
 print c
 
 // Logical operators
-c = !c
+c = !c && true
 print c
 
 
