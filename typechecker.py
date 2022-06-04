@@ -32,7 +32,7 @@ def typecheck_program(program: Program):
 
             while len(type_stack) > 0:
                 top = type_stack.pop()
-                if  top != type:
+                if top != Primitives.Unknown and top != type:
                     print(f"{op.file}:{op.line}:")
                     print(f"Typecheck error: mismatch type on assignment, expected {type} found {top}")
                     exit(1)

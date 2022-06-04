@@ -5,6 +5,7 @@ import sys
 import copy
 
 from compiler import compiler_program
+from interpreter import interpret_program
 
 from parser import parse_program_from_file
 from typechecker import typecheck_program
@@ -12,6 +13,7 @@ from typechecker import typecheck_program
 def print_help():
     print("./huskycat [command] [..file]")
     print("   commands:")
+    print("       - run : interprets the program")
     print("       - compile : compiles the given file to c code")
     print("       - dump : prints the intermeddiate representation")
     print("       - help : prints this menu")
@@ -24,6 +26,16 @@ def main() -> int:
     
     if sys.argv[1] == "help":
         print_help()
+
+    elif sys.argv[1] == "run":
+        if len(sys.argv) < 3:
+            print_help()
+            print("Error: No file path was provided")
+        
+        program = parse_program_from_file(sys.argv[2])
+        typecheck_program(copy.deepcopy(program))        
+
+        interpret_program(program)
 
     elif sys.argv[1] == "dump":
         if len(sys.argv) < 3:
