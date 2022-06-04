@@ -2,6 +2,7 @@
 from ast import parse
 from dataclasses import dataclass
 from enum import Enum, auto
+from pprint import pprint
 import re
 from typing import List, Tuple
 
@@ -21,19 +22,22 @@ class Primitives(Enum):
 
 class OpType(Enum):
 
-    # Allocates memory and declare local varibales
+    # Declare local varibales
     OpBeginScope = auto()
 
-    # Deallocates memory
+    # Removes all local variables
     OpEndScope = auto()
 
-    # Push oprands to stack
+    # Push oprands to a compile time stack
     OpPush = auto()
 
-    # Assignment and evalution of whatever is on the stack
+    # Assignment and evalution of whatever is on the compile time stack
     OpMov = auto()
 
-    # Print intrinstic prints whatever is at the top of stack
+    # Jumps to end of the block if the conditions are not me
+    OpIf = auto()
+
+    # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
 
 
@@ -63,7 +67,6 @@ def parse_primitives(primitive: str) -> Primitives:
     elif primitive == "bool":
         return Primitives.Bool
 
-
     return Primitives.Unknown
 
 
@@ -75,7 +78,7 @@ def parse_int_liternal(symbol: str) -> tuple[int, bool]:
         if not d.isdigit():
             return 0,  False
 
-        num = num + int(d) * i
+        num = num * i + int(d)
         i = i * 10
 
     return num, True
@@ -116,104 +119,85 @@ def find_local_scope(program: Program) -> int:
     return -1
 
 
-def parse_expression(exp: str, program: Program) -> tuple[List[str], List[Primitives]]:
-    eval_stack = []
-    type_stack = []
-    exp = "$" + exp
+def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
+    num, is_int = parse_int_liternal(word)
+    what_bool, is_bool_literal = parse_bool_literal(word)
+    op_index, p_index = find_scope_with_symbol(word, program)
 
-    i = 1
-    num = 0
-    name = ""
+    # Match int literals
+    if is_int:
+        return num, Primitives.I64
 
-    evaluating_int = False
-    evaluating_words = False
+    # Match bool literals
+    elif is_bool_literal:
+        return what_bool, Primitives.Bool
 
-    for ch in exp[::-1]:
+    # Match variables
+    elif op_index != -1:
+        type = program.operations[op_index].types[p_index]
 
-        if ch.isdigit() and not evaluating_words:
-            num = num + int(ch) * i
-            i = i * 10
-            evaluating_int = True
+        return word, type
 
-        elif ch.isalpha():
-            if evaluating_int:
-                name = ch + str(num)
-            else:
-                name = ch + name
+    else:
+        print(
+            f"{file}:{line}:")
+        print(
+            f"Parsing Error : unrecognised word `{word}`")
+        exit(1)
 
-                evaluating_int = False
-                evaluating_words = True
 
-        elif ch in "+-/*%()":
-            if evaluating_int:
-                eval_stack.append(num)
-                type_stack.append(Primitives.I64)
-            elif evaluating_words:
-                op_index, p_index = find_scope_with_symbol(name, program)
-                what_bool, is_bool = parse_bool_literal(name)
+def operator_type(operator: str) -> Primitives:
+    if operator in ["+", "-", "*", "%"]:
+        return Primitives.I64
+    elif operator in ["/"]:
+        return Primitives.F64
+    elif operator in ["!", "<", ">", "&&", "||"]:
+        return Primitives.Bool
 
-                # Match variables
-                if op_index != -1:
-                    type = program.operations[op_index].types[p_index]
-                    eval_stack.append(name)
-                    type_stack.append(type)
+    return Primitives.Unknown
 
-                # Match bool literals
-                elif is_bool:
-                    eval_stack.append(what_bool)
-                    type_stack.append(Primitives.Bool)
-                else:
-                    op = program.operations[op_index]
-                    print(
-                        f"{op.file}:{op.line}:")
-                    print(
-                        f"Parsing Error : unrecognised word `{name}`")
-                    exit(1)
 
-            i = 1
-            num = 0
-            name = ""
-            evaluating_int = False
-            evaluating_words = False
+def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
+    eval_stack: List[int | str] = []
+    type_stack: List[Primitives] = []
 
-            eval_stack.append(ch)
-            # Maybe different types for different operator
-            type_stack.append(Primitives.I64)
+    exp = exp + "$"
+
+    word = ""
+    operator = ""
+
+    for ch in exp:
+
+        # Matching operators
+        if ch in "+-/*%()!&()|<>":
+            if word != "":
+                eval, type = parse_word(word, program, file, line)
+
+                eval_stack.append(eval)
+                type_stack.append(type)
+
+                word = ""
+
+            operator = operator + ch
+
+            if operator in ["+", "-", "/", "*", "%", "!", "<", ">", "&&", "||", "(", ")"]:
+                eval_stack.append(operator)
+                type_stack.append(operator_type(operator))
+
+                operator = ""
 
         elif ch == "$":
-            if evaluating_int:
-                eval_stack.append(num)
-                type_stack.append(Primitives.I64)
-            elif evaluating_words:
-                op_index, p_index = find_scope_with_symbol(name, program)
-                what_bool, is_bool = parse_bool_literal(name)
+            if word != "":
+                eval, type = parse_word(word, program, file, line)
 
-                # Match variables
-                if op_index != -1:
-                    type = program.operations[op_index].types[p_index]
-                    eval_stack.append(name)
-                    type_stack.append(type)
-
-                # Match bool literals
-                elif is_bool:
-                    eval_stack.append(what_bool)
-                    type_stack.append(Primitives.Bool)
-                else:
-                    op = program.operations[op_index]
-                    print(
-                        f"{op.file}:{op.line}:")
-                    print(
-                        f"Parsing Error : unrecognised word `{name}`")
-                    exit(1)
-            break
+                eval_stack.append(eval)
+                type_stack.append(type)
 
         elif ch == " ":
             pass
 
         else:
-            print(
-                f"Parsing Error : unrecognised symbol {ch}")
-            exit(1)
+            word = word + ch
 
     return eval_stack, type_stack
 
@@ -277,7 +261,8 @@ def parse_program_from_file(file_path) -> Program:
                 var_name = var_info[0]
 
                 # assignment
-                eval_stack, types = parse_expression(right_side, program)
+                eval_stack, types = parse_expression(
+                    right_side, program, file_path, line_num)
 
                 program.operations.append(
                     Operation(OpType.OpPush, file_path, line_num, eval_stack, types))

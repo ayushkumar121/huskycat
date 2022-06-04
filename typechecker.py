@@ -31,9 +31,10 @@ def typecheck_program(program: Program):
                 exit(1)
 
             while len(type_stack) > 0:
-                if type_stack.pop() != type:
+                top = type_stack.pop()
+                if  top != type:
                     print(f"{op.file}:{op.line}:")
-                    print(f"Typecheck error: mismatch type on assignment")
+                    print(f"Typecheck error: mismatch type on assignment, expected {type} found {top}")
                     exit(1)
 
         elif op.type == OpType.OpPrint:
