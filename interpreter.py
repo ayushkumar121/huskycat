@@ -128,7 +128,7 @@ def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
     for i, scope in enumerate(scopes[::-1]):
         for j, v in enumerate(scope[::-1]):
             if v.name == var:
-                return i, j
+                return len(scopes) - (i + 1), len(scope) - (j+1)
 
     return -1, -1
 
@@ -156,12 +156,15 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpEndScope:
             scopes.pop()
-            ip += 1
+
+            if len(op.oprands) > 0:
+                ip = op.oprands[-1]
+            else:
+                ip += 1
 
         elif op.type == OpType.OpPush:
-            while len(op.oprands) > 0:
-                val_or_var = op.oprands.pop()
-                op.types.pop()
+            for _, opr in enumerate(op.oprands[::-1]):
+                val_or_var = opr
 
                 i, j = find_var_scope(val_or_var, scopes)
                 if i != -1:
@@ -173,7 +176,7 @@ def interpret_program(program: Program):
             ip += 1
 
         elif op.type == OpType.OpMov:
-            var = op.oprands.pop()
+            var = op.oprands[-1]
 
             value_stack = evaluate_stack(
                 value_stack, op.file, op.line)
@@ -191,11 +194,21 @@ def interpret_program(program: Program):
             ip += 1
 
         elif op.type == OpType.OpIf:
-            tj = op.oprands.pop()
+            tj = op.oprands[-1]
             value_stack = evaluate_stack(
                 value_stack, op.file, op.line)
 
-            if value_stack.pop()  < 1:
+            if value_stack.pop() < 1:
+                ip += tj + 2
+            else:
+                ip += 1
+
+        elif op.type == OpType.OpWhile:
+            tj = op.oprands[-1]
+            value_stack = evaluate_stack(
+                value_stack, op.file, op.line)
+
+            if value_stack.pop() < 1:
                 ip += tj + 2
             else:
                 ip += 1

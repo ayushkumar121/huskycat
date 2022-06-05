@@ -39,7 +39,7 @@ class OpType(Enum):
     # Jumps to end of the block if the condition pushed to slack is false
     OpIf = auto()
 
-    # Jumps back to while if con
+    # Jumps back to while if condition is true or else jumps to end
     OpWhile = auto()
 
     # Print intrinstic prints whatever is at the top of compile time stack
@@ -322,19 +322,43 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpBeginScope, file_path, line_num, [], []))
 
+            # Matching while keyword
+            elif re.fullmatch("while .*{", line):
+                tokens = re.findall("while (.*){", line)
+
+                eval_stack, types = parse_expression(
+                    tokens.pop(), program, file_path, line_num)
+
+                program.operations.append(
+                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+
+                program.operations.append(
+                    Operation(OpType.OpWhile, file_path, line_num, [], []))
+
+                program.operations.append(
+                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+
+            # Matching end of blocks
             elif re.fullmatch("}", line):
                 i = 0
+                j = 0
+                op_type = OpType.OpIf
 
-                for op in program.operations[::-1]:
-                    if op.type == OpType.OpIf and len(op.oprands) == 0:
+                for ip, op in enumerate(program.operations[::-1]):
+                    if op.type in [OpType.OpIf, OpType.OpWhile] and len(op.oprands) == 0:
                         op.oprands.append(i)
-                        op.types.append(Primitives.I64)
+                        op_type = op.type
+                        j = ip
                         break
 
                     i = i+1
+                stack = []
 
+                if op_type == OpType.OpWhile:
+                    stack = [j - 1]
+                
                 program.operations.append(
-                    Operation(OpType.OpEndScope, file_path, line_num, [], []))
+                    Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
             # Matching print intrinsic
             elif re.fullmatch("print[ ]+.*", line):

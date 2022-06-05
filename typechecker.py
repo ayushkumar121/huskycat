@@ -156,5 +156,22 @@ def typecheck_program(program: Program):
                     f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool}")
                 exit(1)                
 
+        elif op.type == OpType.OpWhile:
+            if len(type_stack) == 0:
+                print(f"{op.file}:{op.line}:")
+                print(f"Typecheck error: attempting to typecheck an empty typestack")
+                exit(1)
+
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, op.file, op.line)
+
+            value_stack.pop()
+            found = type_stack.pop()
+            if found != Primitives.Bool:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Typecheck error: unexpected type on while expression, expected {Primitives.Bool}")
+                exit(1)                
+
         elif op.type == OpType.OpPrint:
             pass

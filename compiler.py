@@ -56,10 +56,18 @@ def compile_program_partial(program: Program) -> str:
 
                 c_code += f"{val}"
             c_code += f";\n"
-            ip += 1
 
         elif op.type == OpType.OpIf:
             c_code += "if("
+            while len(value_stack) > 0:
+                val = value_stack.pop()
+                type = type_stack.pop()
+
+                c_code += f"{val}"
+            c_code += ")"
+
+        elif op.type == OpType.OpWhile:
+            c_code += "while("
             while len(value_stack) > 0:
                 val = value_stack.pop()
                 type = type_stack.pop()
