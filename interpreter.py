@@ -214,12 +214,16 @@ def interpret_program(program: Program):
                 val = val_or_var
 
                 if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
-                    val = int.from_bytes(
-                        scopes[i][j].value, "big", signed=True)
+                    if i != -1:
+                        val = int.from_bytes(
+                            scopes[i][j].value, "big", signed=True)
+
                     print(val, end=" ")
                 elif tp == Primitives.Byte:
-                    val = int.from_bytes(
-                        scopes[i][j].value, "big")
+                    if i != -1:
+                        val = int.from_bytes(
+                            scopes[i][j].value, "big", signed=True)
+
                     print(chr(val), end=" ")
                 elif tp == Primitives.Bool:
                     print("true" if val == 1 else "false", end=" ")

@@ -137,21 +137,19 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
     # Match characters
     elif re.fullmatch("\'.\'", word):
         tokens = re.findall("\'(.)\'", word)
-        
+
         if len(tokens) != 0:
             return ord(tokens.pop()), Primitives.Byte
-        
+
         print(
             f"{file}:{line}:")
         print(
             f"Parsing Error : no character inside character brackets")
-        exit(1)        
-
+        exit(1)
 
     # Match variables
     elif op_index != -1:
         type = program.operations[op_index].types[p_index]
-
         return word, type
 
     else:
@@ -218,27 +216,16 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     return eval_stack, type_stack
 
 
-def get_symbol_types(symbols: List[str], program: Program) -> tuple[List[int | str], List[Primitives]]:
+def get_symbol_types(words: List[str], program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
     primitives = []
 
-    for i, symbol in enumerate(symbols):
+    for i, word in enumerate(words):
+        parsed_word, tp = parse_word(word, program, file, line)
+        words[i] = parsed_word
 
-        _, is_int_literal = parse_int_liternal(symbol)
+        primitives.append(tp)
 
-        if is_int_literal:
-            symbols[i] = int(symbol)
-            primitives.append(Primitives.I64)
-            continue
-
-        op_index, p_index = find_scope_with_symbol(symbol, program)
-
-        if op_index != -1:
-            primitives.append(program.operations[op_index].types[p_index])
-            continue
-
-        primitives.append(Primitives.Unknown)
-
-    return symbols, primitives
+    return words, primitives
 
 
 def parse_program_from_file(file_path) -> Program:
@@ -376,15 +363,7 @@ def parse_program_from_file(file_path) -> Program:
                 tokens = re.split(" ", line)
                 tokens.pop(0)
 
-                tokens, types = get_symbol_types(tokens, program)
-
-                if Primitives.Unknown in types:
-                    index = types.index(Primitives.Unknown)
-
-                    print(f"{file_path}:{line_num}:")
-                    print(
-                        f"Parsing Error: unknown symbol {tokens[index]}")
-                    exit(1)
+                tokens, types = get_symbol_types(tokens, program, file_path, line_num)
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, tokens, types))
