@@ -3,17 +3,18 @@
 
 a:i64=10+1*2
 // ^ we need compile time evaluation for this
-
 a=a+1
 
-b:bool=a<14
-
-print a b // we use c printf for printing but we would need a custom function for this in the future
+print a // we use c printf for printing but we would need a custom function for this in the future
 
 // Datatypes: bool (8bit)
-c:bool=true
+b:bool=true
 
-c=1
+// b=1
 // ^  this should fail because of static typechecking
+print b
 
+// Datatypes: byte (8bit)
+
+c:byte='a'
 print c

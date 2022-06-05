@@ -1,16 +1,11 @@
-
-from ast import parse
-from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum, auto
-from pprint import pprint
 import re
-from typing import List, Tuple
-
-from misc import not_implemented
+from typing import List
 
 
 class Primitives(Enum):
+    Byte = auto()
     I32 = auto()
     I64 = auto()
     F32 = auto()
@@ -71,6 +66,8 @@ def parse_primitives(primitive: str) -> Primitives:
         return Primitives.F64
     elif primitive == "bool":
         return Primitives.Bool
+    elif primitive == "byte":
+        return Primitives.Byte
 
     return Primitives.Unknown
 
@@ -136,6 +133,20 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
     # Match bool literals
     elif is_bool_literal:
         return what_bool, Primitives.Bool
+
+    # Match characters
+    elif re.fullmatch("\'.\'", word):
+        tokens = re.findall("\'(.)\'", word)
+        
+        if len(tokens) != 0:
+            return ord(tokens.pop()), Primitives.Byte
+        
+        print(
+            f"{file}:{line}:")
+        print(
+            f"Parsing Error : no character inside character brackets")
+        exit(1)        
+
 
     # Match variables
     elif op_index != -1:
@@ -356,7 +367,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 if op_type == OpType.OpWhile:
                     stack = [j - 1]
-                
+
                 program.operations.append(
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 

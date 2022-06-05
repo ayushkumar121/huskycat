@@ -13,15 +13,11 @@ class Var:
 
 
 def size_of(primitive: Primitives) -> int:
-    if primitive == Primitives.I32:
+    if primitive in [Primitives.I32, Primitives.F32]:
         return 4
-    elif primitive == Primitives.I64:
+    elif primitive in [Primitives.I64, Primitives.F64]:
         return 8
-    elif primitive == Primitives.F32:
-        return 4
-    elif primitive == Primitives.F64:
-        return 8
-    elif primitive == Primitives.Bool:
+    elif primitive in [Primitives.Bool, Primitives.Byte]:
         return 1
 
     return 0
@@ -135,7 +131,6 @@ def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
 
 def interpret_program(program: Program):
     value_stack: List[int | str] = []
-
     scopes: List[List[Var]] = []
 
     ip = 0
@@ -146,10 +141,10 @@ def interpret_program(program: Program):
             vars = []
             while len(op.oprands) > 0:
                 var = op.oprands.pop()
-                type = op.types.pop()
+                tp = op.types.pop()
 
-                vars.append(Var(var, type, size_of(
-                    type), bytearray(size_of(type))))
+                vars.append(Var(var, tp, size_of(
+                    tp), bytearray(size_of(tp))))
 
             scopes.append(vars)
             ip += 1
@@ -164,14 +159,12 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpPush:
             for _, opr in enumerate(op.oprands[::-1]):
-                val_or_var = opr
-
-                i, j = find_var_scope(val_or_var, scopes)
+                i, j = find_var_scope(opr, scopes)
                 if i != -1:
                     value_stack.append(int.from_bytes(
                         scopes[i][j].value, "big"))
                 else:
-                    value_stack.append(val_or_var)
+                    value_stack.append(opr)
 
             ip += 1
 
@@ -215,18 +208,20 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpPrint:
             for i, val_or_var in enumerate(op.oprands):
-                type = op.types[i]
+                tp = op.types[i]
 
                 i, j = find_var_scope(val_or_var, scopes)
                 val = val_or_var
 
-                if i != -1:
+                if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
                     val = int.from_bytes(
                         scopes[i][j].value, "big", signed=True)
-
-                if type in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
                     print(val, end=" ")
-                elif type == Primitives.Bool:
+                elif tp == Primitives.Byte:
+                    val = int.from_bytes(
+                        scopes[i][j].value, "big")
+                    print(chr(val), end=" ")
+                elif tp == Primitives.Bool:
                     print("true" if val == 1 else "false", end=" ")
 
             print()

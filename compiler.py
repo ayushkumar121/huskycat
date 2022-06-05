@@ -28,6 +28,8 @@ def compile_program_partial(program: Program) -> str:
                     c_code += f"f64 {var};\n"
                 elif type == Primitives.Bool:
                     c_code += f"bool {var};\n"
+                elif type == Primitives.Byte:
+                    c_code += f"byte {var};\n"
                 else:
                     print(f"{op.file}:{op.line}:")
                     print(
@@ -90,6 +92,8 @@ def compile_program_partial(program: Program) -> str:
                     c_code += f"print_f64({val_or_var});\n"
                 elif type == Primitives.Bool:
                     c_code += f"print_bool({val_or_var});\n"
+                elif type == Primitives.Byte:
+                    c_code += f"print_byte({val_or_var});\n"
                 else:
                     print(f"{op.file}:{op.line}:")
                     print(
@@ -113,11 +117,7 @@ typedef float f32;
 typedef double f64;
 
 typedef unsigned char bool;
-
-typedef struct{
-int len;
-char *data;
-} Str;
+typedef unsigned char byte;
 
 void print_i32(i32 a) {printf(\"%d \", a);}
 void print_i64(i64 a) {printf(\"%lld \", a);}
@@ -126,6 +126,7 @@ void print_f32(f32 a) {printf(\"%f \", a);}
 void print_f64(f64 a) {printf(\"%lf \", a);}
 
 void print_bool(bool a) {printf(\"%s \", a?"true":"false");}
+void print_byte(byte a) {printf(\"%c \", a);}
 
 int main() {
 """
