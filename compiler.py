@@ -100,8 +100,6 @@ def compile_program_partial(program: Program) -> str:
                         f"Compiler Error : print is not defined for following type")
                     exit(1)
 
-            c_code += f"printf(\"\\n\");\n"
-
     return c_code
 
 
@@ -119,14 +117,14 @@ typedef double f64;
 typedef unsigned char bool;
 typedef unsigned char byte;
 
-void print_i32(i32 a) {printf(\"%d \", a);}
-void print_i64(i64 a) {printf(\"%lld \", a);}
+void print_i32(i32 a) {printf(\"%d\", a);}
+void print_i64(i64 a) {printf(\"%lld\", a);}
 
-void print_f32(f32 a) {printf(\"%f \", a);}
-void print_f64(f64 a) {printf(\"%lf \", a);}
+void print_f32(f32 a) {printf(\"%f\", a);}
+void print_f64(f64 a) {printf(\"%lf\", a);}
 
-void print_bool(bool a) {printf(\"%s \", a?"true":"false");}
-void print_byte(byte a) {printf(\"%c \", a);}
+void print_bool(bool a) {printf(\"%s\", a?"true":"false");}
+void print_byte(byte a) {printf(\"%c\", a);}
 
 int main() {
 """

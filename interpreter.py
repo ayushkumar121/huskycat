@@ -139,9 +139,9 @@ def interpret_program(program: Program):
 
         if op.type == OpType.OpBeginScope:
             vars = []
-            while len(op.oprands) > 0:
-                var = op.oprands.pop()
-                tp = op.types.pop()
+            for opi, opr in enumerate(op.oprands[::-1]):
+                var = opr
+                tp = op.types[opi]
 
                 vars.append(Var(var, tp, size_of(
                     tp), bytearray(size_of(tp))))
@@ -181,7 +181,7 @@ def interpret_program(program: Program):
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Interpreter Error : internal interpreter error (incorrect variable index)")
+                    f"Interpreter Error : internal interpreter error (incorrect variable index) for {var}")
                 exit(1)
 
             ip += 1
@@ -218,15 +218,14 @@ def interpret_program(program: Program):
                         val = int.from_bytes(
                             scopes[i][j].value, "big", signed=True)
 
-                    print(val, end=" ")
+                    print(val, end="")
                 elif tp == Primitives.Byte:
                     if i != -1:
                         val = int.from_bytes(
                             scopes[i][j].value, "big", signed=True)
 
-                    print(chr(val), end=" ")
+                    print(chr(val), end="")
                 elif tp == Primitives.Bool:
-                    print("true" if val == 1 else "false", end=" ")
+                    print("true" if val == 1 else "false", end="")
 
-            print()
             ip += 1

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 import re
+from traceback import print_tb
 from typing import List
 
 
@@ -135,17 +136,25 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         return what_bool, Primitives.Bool
 
     # Match characters
-    elif re.fullmatch("\'.\'", word):
-        tokens = re.findall("\'(.)\'", word)
+    elif re.fullmatch("'\\\?.'", word):
+        tokens: List[str] = re.findall("'(\\\?.)'", word)
 
-        if len(tokens) != 0:
-            return ord(tokens.pop()), Primitives.Byte
-
-        print(
-            f"{file}:{line}:")
-        print(
-            f"Parsing Error : no character inside character brackets")
-        exit(1)
+        if len(tokens) == 1:
+            char = tokens.pop()
+            
+            # Handling character escape
+            if char == '\\n':
+                char = '\n'
+            elif char == '\\\'':
+                char = '\''
+            
+            return ord(char), Primitives.Byte
+        else:
+            print(
+                f"{file}:{line}:")
+            print(
+                f"Parsing Error : no character inside character brackets")
+            exit(1)
 
     # Match variables
     elif op_index != -1:
@@ -346,7 +355,7 @@ def parse_program_from_file(file_path) -> Program:
                     if op.type in [OpType.OpIf, OpType.OpWhile] and len(op.oprands) == 0:
                         op.oprands.append(i)
                         op_type = op.type
-                        j = ip
+                        j = len(program.operations) - (ip + 1)
                         break
 
                     i = i+1
@@ -363,7 +372,8 @@ def parse_program_from_file(file_path) -> Program:
                 tokens = re.split(" ", line)
                 tokens.pop(0)
 
-                tokens, types = get_symbol_types(tokens, program, file_path, line_num)
+                tokens, types = get_symbol_types(
+                    tokens, program, file_path, line_num)
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, tokens, types))
