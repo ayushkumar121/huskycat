@@ -138,7 +138,8 @@ def interpret_program(program: Program):
 
     scopes: List[List[Var]] = []
 
-    for ip in range(len(program.operations)):
+    ip = 0
+    while ip < len(program.operations):
         op = program.operations[ip]
 
         if op.type == OpType.OpBeginScope:
@@ -151,9 +152,11 @@ def interpret_program(program: Program):
                     type), bytearray(size_of(type))))
 
             scopes.append(vars)
+            ip += 1
 
         elif op.type == OpType.OpEndScope:
             scopes.pop()
+            ip += 1
 
         elif op.type == OpType.OpPush:
             while len(op.oprands) > 0:
@@ -166,6 +169,8 @@ def interpret_program(program: Program):
                         scopes[i][j].value, "big"))
                 else:
                     value_stack.append(val_or_var)
+
+            ip += 1
 
         elif op.type == OpType.OpMov:
             var = op.oprands.pop()
@@ -182,6 +187,16 @@ def interpret_program(program: Program):
                 print(
                     f"Interpreter Error : internal interpreter error (incorrect variable index)")
                 exit(1)
+
+            ip += 1
+
+        elif op.type == OpType.OpIf:
+            tj = op.oprands.pop()
+            value_stack = evaluate_stack(
+                value_stack, op.file, op.line)
+
+            if value_stack.pop() > 0:
+                ip += tj
 
         elif op.type == OpType.OpPrint:
             for i, val_or_var in enumerate(op.oprands):
@@ -200,3 +215,4 @@ def interpret_program(program: Program):
                     print("true" if val == 1 else "false", end=" ")
 
             print()
+            ip += 1

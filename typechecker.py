@@ -1,4 +1,5 @@
 from typing import List
+from misc import not_implemented
 from parser import OpType, Primitives, Program
 
 
@@ -103,8 +104,7 @@ def typecheck_program(program: Program):
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
-    for ip in range(len(program.operations)):
-        op = program.operations[ip]
+    for op in program.operations:
 
         if op.type == OpType.OpBeginScope:
             pass
@@ -115,10 +115,10 @@ def typecheck_program(program: Program):
         elif op.type == OpType.OpPush:
             while len(op.oprands) > 0:
                 val = op.oprands.pop()
-                type = op.types.pop()
+                tp = op.types.pop()
 
                 value_stack.append(val)
-                type_stack.append(type)
+                type_stack.append(tp)
 
         elif op.type == OpType.OpMov:
             tp = op.types.pop()
@@ -132,12 +132,29 @@ def typecheck_program(program: Program):
                 value_stack, type_stack, op.file, op.line)
 
             value_stack.pop()
-            exp = type_stack.pop()
-            if tp != exp:
+            found = type_stack.pop()
+            if tp != found:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: mismatch type on assignment, expected {type} found {exp}")
+                    f"Typecheck error: mismatch type on assignment, expected {tp} found {found}")
                 exit(1)
+
+        elif op.type == OpType.OpIf:
+            if len(type_stack) == 0:
+                print(f"{op.file}:{op.line}:")
+                print(f"Typecheck error: attempting to typecheck an empty typestack")
+                exit(1)
+
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, op.file, op.line)
+
+            value_stack.pop()
+            found = type_stack.pop()
+            if found != Primitives.Bool:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool}")
+                exit(1)                
 
         elif op.type == OpType.OpPrint:
             pass

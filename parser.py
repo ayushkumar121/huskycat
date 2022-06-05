@@ -1,5 +1,6 @@
 
 from ast import parse
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum, auto
 from pprint import pprint
@@ -292,8 +293,6 @@ def parse_program_from_file(file_path) -> Program:
                     program.operations[op_index].oprands.append(var_name)
                     program.operations[op_index].types.append(var_type)
                 else:
-                    # TODO: allow casting maybe?
-
                     if len(var_info) != 1:
                         print(f"{file_path}:{line_num}:")
                         print(
@@ -303,6 +302,36 @@ def parse_program_from_file(file_path) -> Program:
                 var_type = program.operations[op_index].types[-1]
                 program.operations.append(
                     Operation(OpType.OpMov, file_path, line_num, [var_name], [var_type]))
+
+            # Matching if keyword
+            elif re.fullmatch("if .*{", line):
+                tokens = re.findall("if (.*){", line)
+
+                eval_stack, types = parse_expression(
+                    tokens.pop(), program, file_path, line_num)
+
+                program.operations.append(
+                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+
+                program.operations.append(
+                    Operation(OpType.OpIf, file_path, line_num, [], []))
+
+                program.operations.append(
+                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+
+            elif re.fullmatch("}", line):
+                i = 0
+
+                for op in program.operations[::-1]:
+                    if op.type == OpType.OpIf and len(op.oprands) == 0:
+                        op.oprands.append(i)
+                        op.types.append(Primitives.I64)
+                        break
+
+                    i = i+1
+
+                program.operations.append(
+                    Operation(OpType.OpEndScope, file_path, line_num, [], []))
 
             # Matching print intrinsic
             elif re.fullmatch("print[ ]+.*", line):
@@ -321,8 +350,6 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, tokens, types))
-
-                pass
 
             # Other
             else:
