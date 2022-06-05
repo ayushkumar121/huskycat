@@ -195,8 +195,10 @@ def interpret_program(program: Program):
             value_stack = evaluate_stack(
                 value_stack, op.file, op.line)
 
-            if value_stack.pop() > 0:
-                ip += tj
+            if value_stack.pop()  < 1:
+                ip += tj + 2
+            else:
+                ip += 1
 
         elif op.type == OpType.OpPrint:
             for i, val_or_var in enumerate(op.oprands):

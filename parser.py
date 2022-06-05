@@ -36,8 +36,11 @@ class OpType(Enum):
     # Assignment and evalution of whatever is on the compile time stack
     OpMov = auto()
 
-    # Jumps to end of the block if the conditions are not me
+    # Jumps to end of the block if the condition pushed to slack is false
     OpIf = auto()
+
+    # Jumps back to while if con
+    OpWhile = auto()
 
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()

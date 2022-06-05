@@ -45,8 +45,8 @@ def main() -> int:
             print("Error: No file path was provided")
 
         program = parse_program_from_file(sys.argv[2])
-        for op in program.operations:
-            print(f"{op.file}:{op.line}", op.type, op.oprands, op.types)
+        for ip, op in enumerate(program.operations):
+            print(f"{ip}:{op.file}:{op.line}", op.type, op.oprands, op.types)
 
     elif sys.argv[1] == "compile":
         if len(sys.argv) < 3:
