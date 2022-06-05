@@ -6,8 +6,7 @@ a:i64=10+1*2
 
 a=a+1
 
-b:i64=7
-b=a-b
+b:bool=a<14
 
 print a b // we use c printf for printing but we would need a custom function for this in the future
 
@@ -33,8 +32,11 @@ print c
 
 // Control flow
 
-// if ,,,,, { <-- jump to label if false
-// 
-// } <-- end
+// if true {
+//     if false {
+//         print 10
+//     }
 
+//     print 20
+// }
 // Compiler configuration the file itself

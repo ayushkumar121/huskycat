@@ -17,6 +17,7 @@ class Primitives(Enum):
     Bool = auto()
     Struct = auto()
     Func = auto()
+    Operator = auto()
     Unknown = auto()
 
 
@@ -182,7 +183,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
 
             if operator in ["+", "-", "/", "*", "%", "!", "<", ">", "&&", "||", "(", ")"]:
                 eval_stack.append(operator)
-                type_stack.append(operator_type(operator))
+                type_stack.append(Primitives.Operator)
 
                 operator = ""
 

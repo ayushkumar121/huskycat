@@ -28,16 +28,16 @@ def size_of(primitive: Primitives) -> int:
 
 
 def predence(operator: str) -> int:
-    if operator in "+-":
+    if operator in ["+", "-", "||", "&&"]:
         return 1
-    if operator in "*/":
+    if operator in ["*", "/", "<", ">"]:
         return 2
     if operator in "!":
         return 3
     return 0
 
 
-def apply_op_binary(a: int, b: int, op: str) -> int | bool:
+def apply_op_binary(a: int, b: int, op: str) -> int:
     if op == "+":
         return a + b
     elif op == "-":
@@ -49,19 +49,23 @@ def apply_op_binary(a: int, b: int, op: str) -> int | bool:
     elif op == "%":
         return a % b
     elif op == "||":
-        return a or b
+        return 1 if (a or b) else 0
     elif op == "&&":
-        return a and b
+        return 1 if (a and b) else 0
+    elif op == "<":
+        return 1 if (a < b) else 0
+    elif op == ">":
+        return 1 if (a > b) else 0
     return 0
 
 
-def apply_op_uinary(a: int, op: str) -> int | bool:
+def apply_op_uinary(a: int, op: str) -> int:
     if op == "!":
-        return not a
+        return 1 if (not a) else 0
     return 0
 
 
-def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[List[int], List[Primitives]]:
+def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[List[int]]:
     value_stack = []
     ops_stack = []
 
@@ -81,10 +85,7 @@ def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[L
             while len(ops_stack) > 0:
                 ops_stack.pop()
 
-        elif type(token) == type(0):
-            value_stack.append(token)
-
-        else:
+        elif token in ["+", "-", "/", "*", "%", "<", ">", "&&", "||", "!"]:
             while len(ops_stack) > 0 and predence(ops_stack[-1]) >= predence(token):
                 op = ops_stack.pop()
 
@@ -102,6 +103,9 @@ def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[L
 
             ops_stack.append(token)
 
+        else:
+            value_stack.append(token)
+
     while len(ops_stack) > 0:
         op = ops_stack.pop()
 
@@ -117,22 +121,7 @@ def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[L
             a = value_stack.pop()
             value_stack.append(apply_op_uinary(a, op))
 
-    if len(value_stack) != 1:
-        print(f"{file}:{line}:")
-        print(
-            f"Interpreter Error : error evaluating expression, eval_stack={eval_stack}")
-        exit(1)
-
-    val = value_stack.pop()
-    val_type = Primitives.Unknown
-
-    if type(val) == type(0):
-        val_type = Primitives.I64
-    elif type(val) == type(True):
-        val = 1 if val else 0
-        val_type = Primitives.Bool
-
-    return [val], [val_type]
+    return value_stack
 
 
 def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
@@ -145,12 +134,12 @@ def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
 
 
 def interpret_program(program: Program):
-    type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
     scopes: List[List[Var]] = []
 
-    for op in program.operations:
+    for ip in range(len(program.operations)):
+        op = program.operations[ip]
 
         if op.type == OpType.OpBeginScope:
             vars = []
@@ -169,7 +158,7 @@ def interpret_program(program: Program):
         elif op.type == OpType.OpPush:
             while len(op.oprands) > 0:
                 val_or_var = op.oprands.pop()
-                type = op.types.pop()
+                op.types.pop()
 
                 i, j = find_var_scope(val_or_var, scopes)
                 if i != -1:
@@ -178,13 +167,11 @@ def interpret_program(program: Program):
                 else:
                     value_stack.append(val_or_var)
 
-                type_stack.append(type)
-
         elif op.type == OpType.OpMov:
             var = op.oprands.pop()
-            type = op.types.pop()
 
-            value_stack, type_stack = evaluate_stack(value_stack, op.file, op.line)
+            value_stack = evaluate_stack(
+                value_stack, op.file, op.line)
             i, j = find_var_scope(var, scopes)
 
             if i != -1:
@@ -193,7 +180,7 @@ def interpret_program(program: Program):
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Interpreter Error : error evaluating expression")
+                    f"Interpreter Error : internal interpreter error (incorrect variable index)")
                 exit(1)
 
         elif op.type == OpType.OpPrint:

@@ -44,7 +44,8 @@ void print_bool(bool a) {printf(\"%s \", a?"true":"false");}
 
 int main() {
 """
-    for op in program.operations:
+    for ip in range(len(program.operations)):
+        op = program.operations[ip]
 
         if op.type == OpType.OpBeginScope:
             c_code += "{\n"
@@ -114,7 +115,6 @@ int main() {
                     exit(1)
 
             c_code += f"printf(\"\\n\");\n"
-            
 
     c_code += """
 return 0;
