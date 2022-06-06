@@ -20,7 +20,7 @@ def size_of(primitive: Primitives) -> int:
     elif primitive in [Primitives.Bool, Primitives.Byte]:
         return 1
 
-    return 0
+    return 8
 
 
 def predence(operator: str) -> int:
@@ -57,6 +57,7 @@ def apply_op_binary(a: int, b: int, op: str) -> int:
 
 def apply_op_uinary(a: int, op: str) -> int:
     if op == "!":
+        print(a, op)
         return 1 if (not a) else 0
     return 0
 
@@ -158,11 +159,12 @@ def interpret_program(program: Program):
                 ip += 1
 
         elif op.type == OpType.OpPush:
-            for _, opr in enumerate(op.oprands[::-1]):
+            for opr in op.oprands[::-1]:
                 i, j = find_var_scope(opr, scopes)
                 if i != -1:
-                    value_stack.append(int.from_bytes(
-                        scopes[i][j].value, "big"))
+                    val = int.from_bytes(
+                        scopes[i][j].value, "big")
+                    value_stack.append(val)
                 else:
                     value_stack.append(opr)
 
@@ -170,6 +172,7 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpMov:
             var = op.oprands[-1]
+            tp = op.types[-1]
 
             value_stack = evaluate_stack(
                 value_stack, op.file, op.line)
@@ -177,7 +180,7 @@ def interpret_program(program: Program):
 
             if i != -1:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
-                    4, "big", signed=True)
+                    size_of(tp), "big")
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -213,17 +216,13 @@ def interpret_program(program: Program):
             i, j = find_var_scope(val_or_var, scopes)
             val = val_or_var
 
-            if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
-                if i != -1:
-                    val = int.from_bytes(
-                        scopes[i][j].value, "big", signed=True)
+            if i != -1:
+                val = int.from_bytes(
+                    scopes[i][j].value, "big")
 
+            if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
                 print(val, end="")
             elif tp == Primitives.Byte:
-                if i != -1:
-                    val = int.from_bytes(
-                        scopes[i][j].value, "big", signed=True)
-
                 print(chr(val), end="")
             elif tp == Primitives.Bool:
                 print("true" if val == 1 else "false", end="")
