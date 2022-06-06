@@ -78,27 +78,27 @@ def compile_program_partial(program: Program) -> str:
             c_code += ")"
 
         elif op.type == OpType.OpPrint:
-            for i, val_or_var in enumerate(op.oprands):
-                type = op.types[i]
+            val_or_var = op.oprands[-1]
+            type = op.types[-1]
 
-                # different print for different type
-                if type == Primitives.I32:
-                    c_code += f"print_i32({val_or_var});\n"
-                elif type == Primitives.I64:
-                    c_code += f"print_i64({val_or_var});\n"
-                elif type == Primitives.F32:
-                    c_code += f"print_f32({val_or_var});\n"
-                elif type == Primitives.F64:
-                    c_code += f"print_f64({val_or_var});\n"
-                elif type == Primitives.Bool:
-                    c_code += f"print_bool({val_or_var});\n"
-                elif type == Primitives.Byte:
-                    c_code += f"print_byte({val_or_var});\n"
-                else:
-                    print(f"{op.file}:{op.line}:")
-                    print(
-                        f"Compiler Error : print is not defined for following type")
-                    exit(1)
+            # different print for different type
+            if type == Primitives.I32:
+                c_code += f"print_i32({val_or_var});\n"
+            elif type == Primitives.I64:
+                c_code += f"print_i64({val_or_var});\n"
+            elif type == Primitives.F32:
+                c_code += f"print_f32({val_or_var});\n"
+            elif type == Primitives.F64:
+                c_code += f"print_f64({val_or_var});\n"
+            elif type == Primitives.Bool:
+                c_code += f"print_bool({val_or_var});\n"
+            elif type == Primitives.Byte:
+                c_code += f"print_byte({val_or_var});\n"
+            else:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Compiler Error : print is not defined for following type")
+                exit(1)
 
     return c_code
 

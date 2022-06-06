@@ -17,4 +17,6 @@ print b
 // Datatypes: byte (8bit)
 
 c:byte='a'
-print c '$'
+
+print c
+print '#'

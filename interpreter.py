@@ -207,25 +207,25 @@ def interpret_program(program: Program):
                 ip += 1
 
         elif op.type == OpType.OpPrint:
-            for i, val_or_var in enumerate(op.oprands):
-                tp = op.types[i]
+            val_or_var = op.oprands[-1]
+            tp = op.types[-1]
 
-                i, j = find_var_scope(val_or_var, scopes)
-                val = val_or_var
+            i, j = find_var_scope(val_or_var, scopes)
+            val = val_or_var
 
-                if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
-                    if i != -1:
-                        val = int.from_bytes(
-                            scopes[i][j].value, "big", signed=True)
+            if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
+                if i != -1:
+                    val = int.from_bytes(
+                        scopes[i][j].value, "big", signed=True)
 
-                    print(val, end="")
-                elif tp == Primitives.Byte:
-                    if i != -1:
-                        val = int.from_bytes(
-                            scopes[i][j].value, "big", signed=True)
+                print(val, end="")
+            elif tp == Primitives.Byte:
+                if i != -1:
+                    val = int.from_bytes(
+                        scopes[i][j].value, "big", signed=True)
 
-                    print(chr(val), end="")
-                elif tp == Primitives.Bool:
-                    print("true" if val == 1 else "false", end="")
+                print(chr(val), end="")
+            elif tp == Primitives.Bool:
+                print("true" if val == 1 else "false", end="")
 
             ip += 1

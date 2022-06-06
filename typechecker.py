@@ -113,15 +113,15 @@ def typecheck_program(program: Program):
             pass
 
         elif op.type == OpType.OpPush:
-            while len(op.oprands) > 0:
-                val = op.oprands.pop()
-                tp = op.types.pop()
+            for i, _ in enumerate(op.oprands[::-1]):
+                val = op.oprands[i]
+                tp = op.types[i]
 
                 value_stack.append(val)
                 type_stack.append(tp)
 
         elif op.type == OpType.OpMov:
-            tp = op.types.pop()
+            tp = op.types[-1]
 
             if len(type_stack) == 0:
                 print(f"{op.file}:{op.line}:")

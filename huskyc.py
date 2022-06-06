@@ -35,7 +35,7 @@ def main() -> int:
             print("Error: No file path was provided")
 
         program = parse_program_from_file(sys.argv[2])
-        typecheck_program(copy.deepcopy(program))
+        typecheck_program(program)
 
         interpret_program(program)
 
@@ -54,7 +54,7 @@ def main() -> int:
             print("Error: No file path was provided")
 
         program = parse_program_from_file(sys.argv[2])
-        typecheck_program(copy.deepcopy(program))
+        typecheck_program(program)
 
         c_code = compile_program(program)
 

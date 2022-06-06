@@ -369,11 +369,10 @@ def parse_program_from_file(file_path) -> Program:
 
             # Matching print intrinsic
             elif re.fullmatch("print[ ]+.*", line):
-                tokens = re.split(" ", line)
-                tokens.pop(0)
+                exp: List[str] = re.findall("print (.*)", line)
 
                 tokens, types = get_symbol_types(
-                    tokens, program, file_path, line_num)
+                    exp, program, file_path, line_num)
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, tokens, types))
