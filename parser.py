@@ -12,8 +12,7 @@ class Primitives(Enum):
     F32 = auto()
     F64 = auto()
     Bool = auto()
-    Struct = auto()
-    Func = auto()
+    Ptr = auto()
     Operator = auto()
     Unknown = auto()
 
@@ -56,6 +55,32 @@ class Program:
     operations: List[Operation]
 
 
+def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
+    l = len(program.operations)
+
+    skip = False
+    for i, op in enumerate(program.operations[::-1]):
+        if op.type == OpType.OpBeginScope:
+            if not skip:
+                if symbol in op.oprands:
+                    return l-(i+1), op.oprands.index(symbol)
+            skip = False
+        elif op.type == OpType.OpBeginScope:
+            skip = True
+
+    return -1, -1
+
+
+def find_local_scope(program: Program) -> int:
+    l = len(program.operations)
+
+    for i, op in enumerate(program.operations[::-1]):
+        if op.type == OpType.OpBeginScope:
+            return l-(i+1)
+
+    return -1
+
+
 def parse_primitives(primitive: str) -> Primitives:
     if primitive == "i32":
         return Primitives.I32
@@ -69,6 +94,8 @@ def parse_primitives(primitive: str) -> Primitives:
         return Primitives.Bool
     elif primitive == "byte":
         return Primitives.Byte
+    elif primitive == "ptr":
+        return Primitives.Ptr
 
     return Primitives.Unknown
 
@@ -96,33 +123,9 @@ def parse_bool_literal(symbol: str) -> tuple[int, bool]:
     return 0, False
 
 
-def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
-    l = len(program.operations)
-
-    skip = False
-    for i, op in enumerate(program.operations[::-1]):
-        if op.type == OpType.OpBeginScope:
-            if not skip:
-                if symbol in op.oprands:
-                    return l-(i+1), op.oprands.index(symbol)
-            skip = False
-        elif op.type == OpType.OpBeginScope:
-            skip = True
-
-    return -1, -1
-
-
-def find_local_scope(program: Program) -> int:
-    l = len(program.operations)
-
-    for i, op in enumerate(program.operations[::-1]):
-        if op.type == OpType.OpBeginScope:
-            return l-(i+1)
-
-    return -1
-
-
 def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
+    word = word.strip()
+
     num, is_int = parse_int_liternal(word)
     what_bool, is_bool_literal = parse_bool_literal(word)
     op_index, p_index = find_scope_with_symbol(word, program)
@@ -141,13 +144,13 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
 
         if len(tokens) == 1:
             char = tokens.pop()
-            
+
             # Handling character escape
             if char == '\\n':
                 char = '\n'
             elif char == '\\\'':
                 char = '\''
-            
+
             return ord(char), Primitives.Byte
         else:
             print(
@@ -169,7 +172,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         exit(1)
 
 
-def operator_type(operator: str) -> Primitives:
+def parse_operator(operator: str) -> Primitives:
     if operator in ["+", "-", "*", "%"]:
         return Primitives.I64
     elif operator in ["/"]:
@@ -225,7 +228,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     return eval_stack, type_stack
 
 
-def get_symbol_types(words: List[str], program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
+def parse_words(words: List[str], program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
     primitives = []
 
     for i, word in enumerate(words):
@@ -272,12 +275,21 @@ def parse_program_from_file(file_path) -> Program:
                 var_info = left_side.split(":")
                 var_name = var_info[0]
 
-                # assignment
-                eval_stack, types = parse_expression(
-                    right_side, program, file_path, line_num)
+                # parsing right side of an assignment
+                if re.fullmatch("resb .+", right_side.strip()):
+                    exp: List[str] = re.findall("resb (.+)", line)
+                    
+                    # const_eval(exp)
 
-                program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                    program.operations.append(
+                        Operation(OpType.OpPush, file_path, line_num, [0], [Primitives.Ptr]))
+                    pass
+                else:
+                    eval_stack, types = parse_expression(
+                        right_side, program, file_path, line_num)
+
+                    program.operations.append(
+                        Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
 
                 op_index, _ = find_scope_with_symbol(var_name, program)
 
@@ -368,10 +380,10 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
             # Matching print intrinsic
-            elif re.fullmatch("print[ ]+.*", line):
-                exp: List[str] = re.findall("print (.*)", line)
+            elif re.fullmatch("print .*", line):
+                exp: List[str] = re.findall("print (.+)", line)
 
-                tokens, types = get_symbol_types(
+                tokens, types = parse_words(
                     exp, program, file_path, line_num)
 
                 program.operations.append(

@@ -29,7 +29,9 @@ def compile_program_partial(program: Program) -> str:
                 elif type == Primitives.Bool:
                     c_code += f"bool {var};\n"
                 elif type == Primitives.Byte:
-                    c_code += f"byte {var};\n"
+                    c_code += f"byte {var};\n"                
+                elif type == Primitives.Ptr:
+                    c_code += f"ptr {var};\n"
                 else:
                     print(f"{op.file}:{op.line}:")
                     print(
@@ -93,7 +95,9 @@ def compile_program_partial(program: Program) -> str:
             elif type == Primitives.Bool:
                 c_code += f"print_bool({val_or_var});\n"
             elif type == Primitives.Byte:
-                c_code += f"print_byte({val_or_var});\n"
+                c_code += f"print_byte({val_or_var});\n"            
+            elif type == Primitives.Ptr:
+                c_code += f"print_ptr({val_or_var});\n"
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -117,6 +121,8 @@ typedef double f64;
 typedef unsigned char bool;
 typedef unsigned char byte;
 
+typedef i64 ptr;
+
 void print_i32(i32 a) {printf(\"%d\", a);}
 void print_i64(i64 a) {printf(\"%lld\", a);}
 
@@ -125,6 +131,8 @@ void print_f64(f64 a) {printf(\"%lf\", a);}
 
 void print_bool(bool a) {printf(\"%s\", a?"true":"false");}
 void print_byte(byte a) {printf(\"%c\", a);}
+
+void print_ptr(ptr a) {printf(\"^%lld\", a);}
 
 int main() {
 """

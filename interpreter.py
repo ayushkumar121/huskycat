@@ -15,7 +15,7 @@ class Var:
 def size_of(primitive: Primitives) -> int:
     if primitive in [Primitives.I32, Primitives.F32]:
         return 4
-    elif primitive in [Primitives.I64, Primitives.F64]:
+    elif primitive in [Primitives.I64, Primitives.F64, Primitives.Ptr]:
         return 8
     elif primitive in [Primitives.Bool, Primitives.Byte]:
         return 1
@@ -57,7 +57,6 @@ def apply_op_binary(a: int, b: int, op: str) -> int:
 
 def apply_op_uinary(a: int, op: str) -> int:
     if op == "!":
-        print(a, op)
         return 1 if (not a) else 0
     return 0
 
@@ -184,7 +183,7 @@ def interpret_program(program: Program):
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Interpreter Error : internal interpreter error (incorrect variable index) for {var}")
+                    f"Interpreter Error : incorrect variable index for {var}")
                 exit(1)
 
             ip += 1
@@ -226,5 +225,12 @@ def interpret_program(program: Program):
                 print(chr(val), end="")
             elif tp == Primitives.Bool:
                 print("true" if val == 1 else "false", end="")
+            elif tp == Primitives.Ptr:
+                print(f"^{val}", end="")
+            else:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Interpreter Error : undefined print for this type")
+                exit(1)                
 
             ip += 1
