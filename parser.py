@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 import re
-from traceback import print_tb
 from typing import List
+
+from misc import not_implemented
 
 
 class Primitives(Enum):
@@ -28,6 +29,9 @@ class OpType(Enum):
     # Push oprands to a compile time stack
     OpPush = auto()
 
+    # Eval value stack
+    # OpEval = auto()
+
     # Assignment and evalution of whatever is on the compile time stack
     OpMov = auto()
 
@@ -52,6 +56,7 @@ class Operation:
 
 @dataclass
 class Program:
+    global_memory: int
     operations: List[Operation]
 
 
@@ -100,7 +105,7 @@ def parse_primitives(primitive: str) -> Primitives:
     return Primitives.Unknown
 
 
-def parse_int_liternal(symbol: str) -> tuple[int, bool]:
+def parse_int_literal(symbol: str) -> tuple[int, bool]:
     i = 1
     num = 0
 
@@ -126,7 +131,7 @@ def parse_bool_literal(symbol: str) -> tuple[int, bool]:
 def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
     word = word.strip()
 
-    num, is_int = parse_int_liternal(word)
+    num, is_int = parse_int_literal(word)
     what_bool, is_bool_literal = parse_bool_literal(word)
     op_index, p_index = find_scope_with_symbol(word, program)
 
@@ -172,17 +177,6 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         exit(1)
 
 
-def parse_operator(operator: str) -> Primitives:
-    if operator in ["+", "-", "*", "%"]:
-        return Primitives.I64
-    elif operator in ["/"]:
-        return Primitives.F64
-    elif operator in ["!", "<", ">", "&&", "||"]:
-        return Primitives.Bool
-
-    return Primitives.Unknown
-
-
 def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
     eval_stack: List[int | str] = []
     type_stack: List[Primitives] = []
@@ -195,7 +189,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     for ch in exp:
 
         # Matching operators
-        if ch in "+-/*%()!&()|<>":
+        if ch in "+-/*%()!&()^|<>":
             if word != "":
                 eval, type = parse_word(word, program, file, line)
 
@@ -206,7 +200,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
 
             operator = operator + ch
 
-            if operator in ["+", "-", "/", "*", "%", "!", "<", ">", "&&", "||", "(", ")"]:
+            if operator in ["+", "-", "/", "*", "%", "!", "^", "<", ">", "&&", "||", "(", ")"]:
                 eval_stack.append(operator)
                 type_stack.append(Primitives.Operator)
 
@@ -228,20 +222,21 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     return eval_stack, type_stack
 
 
-def parse_words(words: List[str], program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
-    primitives = []
+# TODO: implement const eval
+def const_eval(exp: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
+    value, val_type = parse_word(exp, program, file, line)
 
-    for i, word in enumerate(words):
-        parsed_word, tp = parse_word(word, program, file, line)
-        words[i] = parsed_word
+    if type(value) != type(0):
+        print(f"{file}:{line}:")
+        print(
+            f"Parsing Error: unsupported symbol in constant evaluation")
+        exit(1)
 
-        primitives.append(tp)
-
-    return words, primitives
+    return value, val_type
 
 
 def parse_program_from_file(file_path) -> Program:
-    program = Program(operations=[])
+    program = Program(global_memory=1, operations=[])
 
     with open(file_path) as file:
         lines = re.split("[\n]", file.read())
@@ -260,7 +255,8 @@ def parse_program_from_file(file_path) -> Program:
                 continue
 
             #  Matching Assignments
-            elif re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*:?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
+            elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
+                deref = False
                 tokens = re.split("[ ]*=[ ]*", line)
 
                 if len(tokens) > 2:
@@ -269,8 +265,12 @@ def parse_program_from_file(file_path) -> Program:
                         "Parsing Error: muliple '=' found on right side of an assignment")
                     exit(1)
 
-                left_side = tokens[0]
-                right_side = tokens[1]
+                left_side: str = tokens[0]
+                right_side: str = tokens[1]
+
+                if left_side[0] == "^":
+                    left_side = left_side[1:]
+                    deref = True
 
                 var_info = left_side.split(":")
                 var_name = var_info[0]
@@ -278,12 +278,14 @@ def parse_program_from_file(file_path) -> Program:
                 # parsing right side of an assignment
                 if re.fullmatch("resb .+", right_side.strip()):
                     exp: List[str] = re.findall("resb (.+)", line)
-                    
-                    # const_eval(exp)
+
+                    val, type = const_eval(
+                        exp.pop(), program, file_path, line_num)
 
                     program.operations.append(
-                        Operation(OpType.OpPush, file_path, line_num, [0], [Primitives.Ptr]))
-                    pass
+                        Operation(OpType.OpPush, file_path, line_num, [program.global_memory], [Primitives.Ptr]))
+
+                    program.global_memory += val
                 else:
                     eval_stack, types = parse_expression(
                         right_side, program, file_path, line_num)
@@ -291,12 +293,12 @@ def parse_program_from_file(file_path) -> Program:
                     program.operations.append(
                         Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
 
-                op_index, _ = find_scope_with_symbol(var_name, program)
+                i, j = find_scope_with_symbol(var_name, program)
 
                 var_type = Primitives.Unknown
 
                 # declaration
-                if op_index == -1:
+                if i == -1:
                     if len(var_info) != 2:
                         print(f"{file_path}:{line_num}:")
                         print(
@@ -310,10 +312,10 @@ def parse_program_from_file(file_path) -> Program:
                         print(f"Parsing Error: unkown type `{var_info[1]}`")
                         exit(1)
 
-                    op_index = find_local_scope(program)
+                    i = find_local_scope(program)
 
-                    program.operations[op_index].oprands.append(var_name)
-                    program.operations[op_index].types.append(var_type)
+                    program.operations[i].oprands.append(var_name)
+                    program.operations[i].types.append(var_type)
                 else:
                     if len(var_info) != 1:
                         print(f"{file_path}:{line_num}:")
@@ -321,9 +323,16 @@ def parse_program_from_file(file_path) -> Program:
                             f"Parsing Error: cannot redefine types for declared variables")
                         exit(1)
 
-                var_type = program.operations[op_index].types[-1]
+                var_type = program.operations[i].types[j]
+
+                if deref and var_type != Primitives.Ptr:
+                    print(f"{file_path}:{line_num}:")
+                    print(
+                        f"Parsing Error: cannot deref non ptr values")
+                    exit(1)
+
                 program.operations.append(
-                    Operation(OpType.OpMov, file_path, line_num, [var_name], [var_type]))
+                    Operation(OpType.OpMov, file_path, line_num, [deref, var_name], [var_type]))
 
             # Matching if keyword
             elif re.fullmatch("if .*{", line):
@@ -383,11 +392,14 @@ def parse_program_from_file(file_path) -> Program:
             elif re.fullmatch("print .*", line):
                 exp: List[str] = re.findall("print (.+)", line)
 
-                tokens, types = parse_words(
-                    exp, program, file_path, line_num)
+                eval_stack, types = parse_expression(
+                    exp.pop(), program, file_path, line_num)
 
                 program.operations.append(
-                    Operation(OpType.OpPrint, file_path, line_num, tokens, types))
+                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+
+                program.operations.append(
+                    Operation(OpType.OpPrint, file_path, line_num, [], []))
 
             # Other
             else:

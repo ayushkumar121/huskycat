@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pprint import pprint
 from typing import List, Type
 from misc import not_implemented
 from parser import OpType, Primitives, Program
@@ -9,7 +10,7 @@ class Var:
     name: str
     type: Primitives
     size: int
-    value: bytearray
+    value: bytes
 
 
 def size_of(primitive: Primitives) -> int:
@@ -33,7 +34,7 @@ def predence(operator: str) -> int:
     return 0
 
 
-def apply_op_binary(a: int, b: int, op: str) -> int:
+def apply_op_binary(a: int, b: int, op: str, global_memory: bytearray) -> int:
     if op == "+":
         return a + b
     elif op == "-":
@@ -55,13 +56,31 @@ def apply_op_binary(a: int, b: int, op: str) -> int:
     return 0
 
 
-def apply_op_uinary(a: int, op: str) -> int:
+def apply_op_uinary(a: int, op: str, global_memory: bytearray) -> int:
     if op == "!":
         return 1 if (not a) else 0
+    elif op == "^":
+        return global_memory[a]
     return 0
 
 
-def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[List[int]]:
+def evaluate_operation(value_stack: List[int], ops_stack: List[str], global_memory: bytearray, file: str, line: int):
+    op = ops_stack.pop()
+
+    # Binary operators
+    if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
+        a = value_stack.pop()
+        b = value_stack.pop()
+
+        value_stack.append(apply_op_binary(a, b, op, global_memory))
+
+    # Uninary operators
+    elif op in ["!", "^"]:
+        a = value_stack.pop()
+        value_stack.append(apply_op_uinary(a, op, global_memory))
+
+
+def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: str, line: int) -> tuple[List[int]]:
     value_stack = []
     ops_stack = []
 
@@ -71,51 +90,29 @@ def evaluate_stack(eval_stack: List[int | str], file: str, line: int) -> tuple[L
 
         elif str(token) == ")":
             while len(ops_stack) > 0 and ops_stack[-1] != "(":
-                a = value_stack.pop()
-                b = value_stack.pop()
-
-                op = ops_stack.pop()
-
-                value_stack.append(apply_op_binary(a, b, op))
+                evaluate_operation(value_stack, ops_stack,
+                                   global_memory, file, line)
 
             while len(ops_stack) > 0:
                 ops_stack.pop()
 
-        elif token in ["+", "-", "/", "*", "%", "<", ">", "&&", "||", "!"]:
+        elif token in ["+", "-", "/", "*", "%", "<", ">", "&&", "||", "!",  "^"]:
             while len(ops_stack) > 0 and predence(ops_stack[-1]) >= predence(token):
-                op = ops_stack.pop()
-
-                # Binary operators
-                if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
-                    a = value_stack.pop()
-                    b = value_stack.pop()
-
-                    value_stack.append(apply_op_binary(a, b, op))
-
-                # Uninary operators
-                elif op in "!":
-                    a = value_stack.pop()
-                    value_stack.append(apply_op_uinary(a, op))
+                evaluate_operation(value_stack, ops_stack,
+                                   global_memory, file, line)
 
             ops_stack.append(token)
 
-        else:
+        elif type(token) == type(0):
             value_stack.append(token)
+        else:
+            print(f"{file}:{line}:")
+            print(
+                f"Interpreter Error : unrecognised token `{token}` in eval stack")
+            exit(1)
 
     while len(ops_stack) > 0:
-        op = ops_stack.pop()
-
-        # Binary operators
-        if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
-            a = value_stack.pop()
-            b = value_stack.pop()
-
-            value_stack.append(apply_op_binary(a, b, op))
-
-        # Uninary operators
-        elif op in "!":
-            a = value_stack.pop()
-            value_stack.append(apply_op_uinary(a, op))
+        evaluate_operation(value_stack, ops_stack, global_memory, file, line)
 
     return value_stack
 
@@ -132,6 +129,8 @@ def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
 def interpret_program(program: Program):
     value_stack: List[int | str] = []
     scopes: List[List[Var]] = []
+
+    global_memory = bytearray(program.global_memory)
 
     ip = 0
     while ip < len(program.operations):
@@ -161,8 +160,22 @@ def interpret_program(program: Program):
             for opr in op.oprands[::-1]:
                 i, j = find_var_scope(opr, scopes)
                 if i != -1:
-                    val = int.from_bytes(
-                        scopes[i][j].value, "big")
+                    val = 0
+                    tp = scopes[i][j].type
+
+                    if tp in [Primitives.I32, Primitives.I64, Primitives.Byte,
+                              Primitives.Bool, Primitives.Ptr]:
+                        val = int.from_bytes(
+                            scopes[i][j].value, "big")
+                    elif tp in [Primitives.F32, Primitives.F64]:
+                        val = float.from_bytes(
+                            scopes[i][j].value, "big")
+                    else:
+                        print(f"{op.file}:{op.line}:")
+                        print(
+                            f"Interpreter Error : evaluation of type `{tp} not supported`")
+                        exit(1)
+
                     value_stack.append(val)
                 else:
                     value_stack.append(opr)
@@ -171,19 +184,31 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpMov:
             var = op.oprands[-1]
+            deref = op.oprands[-2]
             tp = op.types[-1]
 
             value_stack = evaluate_stack(
-                value_stack, op.file, op.line)
+                value_stack, global_memory, op.file, op.line)
             i, j = find_var_scope(var, scopes)
 
-            if i != -1:
+            if deref:
+                deref_index = int.from_bytes(
+                    scopes[i][j].value, "big")
+
+                global_memory[deref_index] = value_stack.pop()
+
+            elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of(tp), "big")
+            
+            elif tp in [Primitives.F32, Primitives.F64]:
+                scopes[i][j].value = float(value_stack.pop()).to_bytes(
+                    size_of(tp), "big")
+            
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Interpreter Error : incorrect variable index for {var}")
+                    f"Interpreter Error : assignment for this type not defined")
                 exit(1)
 
             ip += 1
@@ -209,28 +234,23 @@ def interpret_program(program: Program):
                 ip += 1
 
         elif op.type == OpType.OpPrint:
-            val_or_var = op.oprands[-1]
             tp = op.types[-1]
 
-            i, j = find_var_scope(val_or_var, scopes)
-            val = val_or_var
-
-            if i != -1:
-                val = int.from_bytes(
-                    scopes[i][j].value, "big")
+            value_stack = evaluate_stack(
+                value_stack, global_memory, op.file, op.line)
 
             if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
-                print(val, end="")
+                print(value_stack.pop(), end="")
             elif tp == Primitives.Byte:
-                print(chr(val), end="")
+                print(chr(value_stack.pop()), end="")
             elif tp == Primitives.Bool:
-                print("true" if val == 1 else "false", end="")
+                print("true" if value_stack.pop() == 1 else "false", end="")
             elif tp == Primitives.Ptr:
-                print(f"^{val}", end="")
+                print(f"^{value_stack.pop()}", end="")
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
                     f"Interpreter Error : undefined print for this type")
-                exit(1)                
+                exit(1)
 
             ip += 1

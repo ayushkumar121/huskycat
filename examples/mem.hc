@@ -1,10 +1,18 @@
 // Arrays
 
-// str:type=struct(int64, byte[])
+// reserving 10 bytes of global memory
+arr:ptr = resb 10
 
-arr:ptr = resb 10*8
+^arr = 'b'
+b:byte =  ^arr
 
-print arr // deref the first byte ?
+arr = arr + 1
+^arr = 'c'
+c:byte =  ^arr
+
+print b
 print '\n'
 
+print c
+print '\n'
 // this will point to a statically allocated array 
