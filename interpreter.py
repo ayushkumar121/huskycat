@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pprint import pprint
 from typing import List, Type
-from misc import not_implemented
+from misc import not_implemented, operator_predence, operator_list, binary_operators, unary_operators
 from parser import OpType, Primitives, Program
 
 
@@ -24,35 +24,27 @@ def size_of(primitive: Primitives) -> int:
     return 8
 
 
-def predence(operator: str) -> int:
-    if operator in ["+", "-", "||", "&&"]:
-        return 1
-    if operator in ["*", "/", "<", ">"]:
-        return 2
-    if operator in "!":
-        return 3
-    return 0
-
-
 def apply_op_binary(a: int, b: int, op: str, global_memory: bytearray) -> int:
     if op == "+":
-        return a + b
+        return b + a
     elif op == "-":
-        return a-b
+        return b - a
     elif op == "/":
-        return a / b
+        return b / a
     elif op == "*":
-        return a * b
+        return b * a
     elif op == "%":
-        return a % b
+        return b % a
     elif op == "||":
-        return 1 if (a or b) else 0
+        return 1 if (b or a) else 0
     elif op == "&&":
-        return 1 if (a and b) else 0
+        return 1 if (b and a) else 0
     elif op == "<":
-        return 1 if (a < b) else 0
+        return 1 if (b < a) else 0
     elif op == ">":
-        return 1 if (a > b) else 0
+        return 1 if (b > a) else 0
+    elif op == "==":
+        return 1 if (b == a) else 0
     return 0
 
 
@@ -68,14 +60,14 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], global_memo
     op = ops_stack.pop()
 
     # Binary operators
-    if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
+    if op in binary_operators:
         a = value_stack.pop()
         b = value_stack.pop()
 
         value_stack.append(apply_op_binary(a, b, op, global_memory))
 
     # Uninary operators
-    elif op in ["!", "^"]:
+    elif op in unary_operators:
         a = value_stack.pop()
         value_stack.append(apply_op_uinary(a, op, global_memory))
 
@@ -84,7 +76,7 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
     value_stack = []
     ops_stack = []
 
-    for token in eval_stack:
+    for token in eval_stack[::-1]:
         if str(token) == "(":
             ops_stack.append(token)
 
@@ -93,11 +85,11 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
                 evaluate_operation(value_stack, ops_stack,
                                    global_memory, file, line)
 
-            while len(ops_stack) > 0:
+            if len(ops_stack) > 0:
                 ops_stack.pop()
 
-        elif token in ["+", "-", "/", "*", "%", "<", ">", "&&", "||", "!",  "^"]:
-            while len(ops_stack) > 0 and predence(ops_stack[-1]) >= predence(token):
+        elif str(token) in operator_list:
+            while len(ops_stack) > 0 and operator_predence(ops_stack[-1]) >= operator_predence(token):
                 evaluate_operation(value_stack, ops_stack,
                                    global_memory, file, line)
 
@@ -137,10 +129,11 @@ def interpret_program(program: Program):
         op = program.operations[ip]
 
         if op.type == OpType.OpBeginScope:
+
             vars = []
             for opi, opr in enumerate(op.oprands[::-1]):
                 var = opr
-                tp = op.types[opi]
+                tp = op.types[len(op.oprands) - (opi+1)]
 
                 vars.append(Var(var, tp, size_of(
                     tp), bytearray(size_of(tp))))
@@ -157,8 +150,11 @@ def interpret_program(program: Program):
                 ip += 1
 
         elif op.type == OpType.OpPush:
+            value_stack = []
+
             for opr in op.oprands[::-1]:
                 i, j = find_var_scope(opr, scopes)
+
                 if i != -1:
                     val = 0
                     tp = scopes[i][j].type
@@ -195,16 +191,22 @@ def interpret_program(program: Program):
                 deref_index = int.from_bytes(
                     scopes[i][j].value, "big")
 
-                global_memory[deref_index] = value_stack.pop()
+                if deref_index > program.global_memory - 1:
+                    print(f"{op.file}:{op.line}:")
+                    print(
+                    f"Interpreter Error : cannot access more memory than allocated")
+                    exit(1)                   
+
+                global_memory[deref_index] = int(value_stack.pop())
 
             elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of(tp), "big")
-            
+
             elif tp in [Primitives.F32, Primitives.F64]:
                 scopes[i][j].value = float(value_stack.pop()).to_bytes(
                     size_of(tp), "big")
-            
+
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -215,8 +217,9 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpIf:
             tj = op.oprands[-1]
+
             value_stack = evaluate_stack(
-                value_stack, op.file, op.line)
+                value_stack, global_memory, op.file, op.line)
 
             if value_stack.pop() < 1:
                 ip += tj + 2
@@ -225,8 +228,9 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]
+
             value_stack = evaluate_stack(
-                value_stack, op.file, op.line)
+                value_stack, global_memory, op.file, op.line)
 
             if value_stack.pop() < 1:
                 ip += tj + 2
@@ -253,4 +257,10 @@ def interpret_program(program: Program):
                     f"Interpreter Error : undefined print for this type")
                 exit(1)
 
+            ip += 1
+
+        elif op.type == OpType.OpGoto:
+            ip = op.oprands[-1]
+
+        elif op.type == OpType.OpLabel:
             ip += 1

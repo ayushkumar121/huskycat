@@ -8,6 +8,28 @@ from parser import OpType, Primitives, Program
 #     return a
 
 
+def compile_expression(value_stack: List, type_stack: List) -> str:
+    c_code = ""
+    brackets_start = False
+
+    while len(value_stack) > 0:
+
+        val = value_stack.pop()
+        _ = type_stack.pop()
+
+        if val == "^":
+            c_code += f"*(global_memory+"
+            brackets_start = True
+        else:
+            c_code += f"{val}"
+
+            if brackets_start:
+                c_code += f")"
+                brackets_start = False
+
+    return c_code
+
+
 def compile_program_partial(program: Program) -> str:
     c_code = ""
 
@@ -65,38 +87,17 @@ def compile_program_partial(program: Program) -> str:
             else:
                 c_code += f"{var}="
 
-            brackets_start = False
-            while len(value_stack) > 0:
-                val = value_stack.pop()
-                _ = type_stack.pop()
-
-                if val == "^":
-                    c_code += f"*(global_memory+"
-                    brackets_start = True
-                else:
-                    c_code += f"{val}"
-
-                    if brackets_start:
-                        c_code += f")"
-                        brackets_start = False
+            c_code += compile_expression(value_stack, type_stack)
             c_code += f";\n"
 
         elif op.type == OpType.OpIf:
             c_code += "if("
-            while len(value_stack) > 0:
-                val = value_stack.pop()
-                type = type_stack.pop()
-
-                c_code += f"{val}"
+            c_code += compile_expression(value_stack, type_stack)
             c_code += ")"
 
         elif op.type == OpType.OpWhile:
             c_code += "while("
-            while len(value_stack) > 0:
-                val = value_stack.pop()
-                type = type_stack.pop()
-
-                c_code += f"{val}"
+            c_code += compile_expression(value_stack, type_stack)
             c_code += ")"
 
         elif op.type == OpType.OpPrint:
@@ -123,22 +124,16 @@ def compile_program_partial(program: Program) -> str:
                     f"Compiler Error : print is not defined for following type")
                 exit(1)
 
-            brackets_start = False
-            while len(value_stack) > 0:
-                val = value_stack.pop()
-                _ = type_stack.pop()
-
-                if val == "^":
-                    c_code += f"*(global_memory+"
-                    brackets_start = True
-                else:
-                    c_code += f"{val}"
-
-                    if brackets_start:
-                        c_code += f")"
-                        brackets_start = False
-
+            c_code += compile_expression(value_stack, type_stack)
             c_code += ");\n"
+
+        elif op.type == OpType.OpGoto:
+            label = op.oprands[-2]
+            c_code += f"goto {label};\n"
+
+        elif op.type == OpType.OpLabel:
+            label = op.oprands[-1]
+            c_code += f"{label}:\n"
 
     return c_code
 

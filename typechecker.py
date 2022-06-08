@@ -1,16 +1,6 @@
 from typing import List
-from misc import not_implemented
+from misc import not_implemented, operator_predence, operator_list, binary_operators, unary_operators
 from parser import OpType, Primitives, Program
-
-
-def predence(operator: str) -> int:
-    if operator in ["+", "-", "||", "&&"]:
-        return 1
-    if operator in ["*", "/", "<", ">"]:
-        return 2
-    if operator in "!":
-        return 3
-    return 0
 
 
 def apply_op_binary(a: Primitives, b: Primitives, op: str) -> Primitives:
@@ -18,7 +8,7 @@ def apply_op_binary(a: Primitives, b: Primitives, op: str) -> Primitives:
         return a
     elif op == "%":
         return Primitives.I64
-    elif op in ["||", "&&", ">", "<"]:
+    elif op in ["||", "&&", ">", "<", "=="]:
         return Primitives.Bool
 
     return Primitives.Unknown
@@ -33,44 +23,43 @@ def apply_op_uinary(a: int, op: str) -> Primitives:
     return Primitives.Unknown
 
 
+def evaluate_operation(type_stack: List[Primitives], ops_stack: List[str], file: str, line: int):
+    op = ops_stack.pop()
+
+    # Binary operators
+    if op in binary_operators:
+        a = type_stack.pop()
+        b = type_stack.pop()
+
+        type_stack.append(apply_op_binary(a, b, op))
+
+    # Uninary operators
+    elif op in unary_operators:
+        a = type_stack.pop()
+        type_stack.append(apply_op_uinary(a, op))
+
+
 def evaluate_stack(eval_stack: List[int | str],
                    types: List[Primitives],
                    file: str, line: int) -> tuple[List[int], List[Primitives]]:
 
-    type_stack = []
-    ops_stack = []
+    type_stack: List[Primitives] = []
+    ops_stack: List[str] = []
 
     for i, token in enumerate(eval_stack):
-        if str(token) == "(":
+        if str(token) == ")":
             ops_stack.append(token)
 
-        elif str(token) == ")":
-            while len(ops_stack) > 0 and ops_stack[-1] != "(":
-                a = type_stack.pop()
-                b = type_stack.pop()
-
-                op = ops_stack.pop()
-
-                type_stack.append(apply_op_binary(a, b, op))
+        elif str(token) == "(":
+            while len(ops_stack) > 0 and ops_stack[-1] != ")":
+                evaluate_operation(type_stack, ops_stack, file, line)
 
             while len(ops_stack) > 0:
                 ops_stack.pop()
 
-        elif token in ["+", "-", "/", "*", "%", "<", ">", "&&", "||", "!", "^"]:
-            while len(ops_stack) > 0 and predence(ops_stack[-1]) >= predence(token):
-                op = ops_stack.pop()
-
-                # Binary operators
-                if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
-                    a = type_stack.pop()
-                    b = type_stack.pop()
-
-                    type_stack.append(apply_op_binary(a, b, op))
-
-                # Uninary operators
-                elif op in ["!", "^"]:
-                    a = type_stack.pop()
-                    type_stack.append(apply_op_uinary(a, op))
+        elif token in operator_list:
+            while len(ops_stack) > 0 and operator_predence(ops_stack[-1]) >= operator_predence(token):
+                evaluate_operation(type_stack, ops_stack, file, line)
 
             ops_stack.append(token)
 
@@ -78,19 +67,7 @@ def evaluate_stack(eval_stack: List[int | str],
             type_stack.append(types[i])
 
     while len(ops_stack) > 0:
-        op = ops_stack.pop()
-
-        # Binary operators
-        if op in ["+", "-", "/", "*", "%", "<", ">", "&&", "||"]:
-            a = type_stack.pop()
-            b = type_stack.pop()
-
-            type_stack.append(apply_op_binary(a, b, op))
-
-        # Uninary operators
-        elif op in ["!", "^"]:
-            a = type_stack.pop()
-            type_stack.append(apply_op_uinary(a, op))
+        evaluate_operation(type_stack, ops_stack, file, line)
 
     return [0], type_stack
 
@@ -108,10 +85,11 @@ def typecheck_program(program: Program):
             pass
 
         elif op.type == OpType.OpPush:
-            n = len(op.oprands)
+            value_stack = []
+            type_stack = []
             for i, opr in enumerate(op.oprands[::-1]):
                 val = opr
-                tp = op.types[n - (i + 1)]
+                tp = op.types[len(op.oprands) - (i+1)]
 
                 value_stack.append(val)
                 type_stack.append(tp)
@@ -133,6 +111,7 @@ def typecheck_program(program: Program):
 
             value_stack.pop()
             found = type_stack.pop()
+
             if tp != found:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -153,7 +132,7 @@ def typecheck_program(program: Program):
             if found != Primitives.Bool:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool}")
+                    f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool} found {found}")
                 exit(1)
 
         elif op.type == OpType.OpWhile:
@@ -170,7 +149,7 @@ def typecheck_program(program: Program):
             if found != Primitives.Bool:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: unexpected type on while expression, expected {Primitives.Bool}")
+                    f"Typecheck error: unexpected type on while expression, expected {Primitives.Bool} found {found}")
                 exit(1)
 
         elif op.type == OpType.OpPrint:
@@ -180,3 +159,9 @@ def typecheck_program(program: Program):
             value_stack.pop()
 
             op.types.append(type_stack.pop())
+        
+        elif op.type == OpType.OpGoto:
+            pass
+
+        elif op.type == OpType.OpLabel:
+            pass

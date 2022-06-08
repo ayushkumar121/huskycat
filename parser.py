@@ -3,7 +3,7 @@ from enum import Enum, auto
 import re
 from typing import List
 
-from misc import not_implemented
+from misc import not_implemented, operator_list
 
 
 class Primitives(Enum):
@@ -29,9 +29,6 @@ class OpType(Enum):
     # Push oprands to a compile time stack
     OpPush = auto()
 
-    # Eval value stack
-    # OpEval = auto()
-
     # Assignment and evalution of whatever is on the compile time stack
     OpMov = auto()
 
@@ -43,6 +40,9 @@ class OpType(Enum):
 
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
+
+    OpGoto = auto()
+    OpLabel = auto()
 
 
 @dataclass
@@ -79,9 +79,14 @@ def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
 def find_local_scope(program: Program) -> int:
     l = len(program.operations)
 
+    skip = False
     for i, op in enumerate(program.operations[::-1]):
         if op.type == OpType.OpBeginScope:
-            return l-(i+1)
+            if not skip:
+                return l-(i+1)
+            skip = False
+        elif op.type == OpType.OpEndScope:
+            skip = True
 
     return -1
 
@@ -106,15 +111,13 @@ def parse_primitives(primitive: str) -> Primitives:
 
 
 def parse_int_literal(symbol: str) -> tuple[int, bool]:
-    i = 1
     num = 0
 
     for d in symbol:
         if not d.isdigit():
             return 0,  False
 
-        num = num * i + int(d)
-        i = i * 10
+        num = num * 10 + int(d)
 
     return num, True
 
@@ -155,6 +158,8 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
                 char = '\n'
             elif char == '\\\'':
                 char = '\''
+            elif char == '\\b':
+                char = ' '
 
             return ord(char), Primitives.Byte
         else:
@@ -181,15 +186,13 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     eval_stack: List[int | str] = []
     type_stack: List[Primitives] = []
 
-    exp = exp + "$"
-
     word = ""
     operator = ""
 
-    for ch in exp:
+    for i,ch in enumerate(exp):
 
         # Matching operators
-        if ch in "+-/*%()!&()^|<>":
+        if ch in "=+-/*%()!&^|<>":
             if word != "":
                 eval, type = parse_word(word, program, file, line)
 
@@ -199,25 +202,24 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
                 word = ""
 
             operator = operator + ch
-
-            if operator in ["+", "-", "/", "*", "%", "!", "^", "<", ">", "&&", "||", "(", ")"]:
+            if operator in operator_list:
                 eval_stack.append(operator)
                 type_stack.append(Primitives.Operator)
 
                 operator = ""
-
-        elif ch == "$":
-            if word != "":
-                eval, type = parse_word(word, program, file, line)
-
-                eval_stack.append(eval)
-                type_stack.append(type)
 
         elif ch == " ":
             pass
 
         else:
             word = word + ch
+
+        if i == len(exp) - 1:
+            if word != "":
+                eval, type = parse_word(word, program, file, line)
+
+                eval_stack.append(eval)
+                type_stack.append(type)
 
     return eval_stack, type_stack
 
@@ -389,7 +391,7 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
             # Matching print intrinsic
-            elif re.fullmatch("print .*", line):
+            elif re.fullmatch("print .+", line):
                 exp: List[str] = re.findall("print (.+)", line)
 
                 eval_stack, types = parse_expression(
@@ -401,6 +403,24 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, [], []))
 
+            # Matching goto intrinsic
+            elif re.fullmatch("goto .+", line):
+                exp: List[str] = re.findall("goto (.+)", line)
+
+                program.operations.append(
+                    Operation(OpType.OpGoto, file_path, line_num, [exp.pop()], []))
+
+            # Matching goto intrinsic
+            elif re.fullmatch(":[a-zA-Z][a-zA-Z0-9_]*", line):
+                exp: List[str] = re.findall(":(.*)", line)
+                label = exp.pop()
+                
+                for ip, op in enumerate(program.operations[::-1]):
+                    if op.type in [OpType.OpGoto] and op.oprands[-1] == label:
+                        op.oprands.append(len(program.operations))
+
+                program.operations.append(
+                    Operation(OpType.OpLabel, file_path, line_num, [label], []))                       
             # Other
             else:
                 print(f"{file_path}:{line_num}:")
