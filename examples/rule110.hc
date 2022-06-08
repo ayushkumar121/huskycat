@@ -28,12 +28,6 @@ while i<height {
     }
     print '\n'
     
-    // j = 0
-    // s4:ptr=state+((i+1)*width)
-    // ^s4='@'
-
-    // print s4
-    // print '\n'
     j = 0
     while (j<width-2) && (i<height-1){
         s1:ptr=state+j+ i*width
