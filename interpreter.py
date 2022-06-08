@@ -106,6 +106,12 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
     while len(ops_stack) > 0:
         evaluate_operation(value_stack, ops_stack, global_memory, file, line)
 
+    if len(value_stack) != 1:
+        print(f"{file}:{line}:")
+        print(
+            f"Interpreter Error : unable to evalution following stack {eval_stack}")
+        exit(1)
+
     return value_stack
 
 
@@ -194,8 +200,8 @@ def interpret_program(program: Program):
                 if deref_index > program.global_memory - 1:
                     print(f"{op.file}:{op.line}:")
                     print(
-                    f"Interpreter Error : cannot access more memory than allocated")
-                    exit(1)                   
+                        f"Interpreter Error : cannot access more memory than allocated")
+                    exit(1)
 
                 global_memory[deref_index] = int(value_stack.pop())
 

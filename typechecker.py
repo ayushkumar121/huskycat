@@ -5,7 +5,7 @@ from parser import OpType, Primitives, Program
 
 def apply_op_binary(a: Primitives, b: Primitives, op: str) -> Primitives:
     if op in ["+",  "-", "*", "/"]:
-        return a
+        return b
     elif op == "%":
         return Primitives.I64
     elif op in ["||", "&&", ">", "<", "=="]:
@@ -46,18 +46,20 @@ def evaluate_stack(eval_stack: List[int | str],
     type_stack: List[Primitives] = []
     ops_stack: List[str] = []
 
-    for i, token in enumerate(eval_stack):
-        if str(token) == ")":
+    for i, token in enumerate(eval_stack[::-1]):
+        i = len(eval_stack) - (i+1)
+
+        if str(token) == "(":
             ops_stack.append(token)
 
-        elif str(token) == "(":
-            while len(ops_stack) > 0 and ops_stack[-1] != ")":
+        elif str(token) == ")":
+            while len(ops_stack) > 0 and ops_stack[-1] != "(":
                 evaluate_operation(type_stack, ops_stack, file, line)
 
-            while len(ops_stack) > 0:
+            if len(ops_stack) > 0:
                 ops_stack.pop()
 
-        elif token in operator_list:
+        elif str(token) in operator_list:
             while len(ops_stack) > 0 and operator_predence(ops_stack[-1]) >= operator_predence(token):
                 evaluate_operation(type_stack, ops_stack, file, line)
 
@@ -69,6 +71,11 @@ def evaluate_stack(eval_stack: List[int | str],
     while len(ops_stack) > 0:
         evaluate_operation(type_stack, ops_stack, file, line)
 
+    if len(type_stack) != 1:
+        print(f"{file}:{line}:")
+        print(
+            f"Typecheck Error : unable to type evaluate following stack {eval_stack}")
+        exit(1)
     return [0], type_stack
 
 
