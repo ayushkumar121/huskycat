@@ -83,6 +83,8 @@ def typecheck_program(program: Program):
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
+    assert  len(OpType) == 10, "Exhaustive handling of operations"
+
     for op in program.operations:
 
         if op.type == OpType.OpBeginScope:
@@ -141,6 +143,10 @@ def typecheck_program(program: Program):
                 print(
                     f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool} found {found}")
                 exit(1)
+
+
+        elif op.type == OpType.OpElse:
+            pass
 
         elif op.type == OpType.OpWhile:
             if len(type_stack) == 0:

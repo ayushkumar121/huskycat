@@ -1,7 +1,7 @@
 
-width:i64=30
-height:i64=20
-state:ptr=resb 600
+width:i64=80
+height:i64=30
+state:ptr=resb 2400
 s:ptr=state
 
 i:i64 = 0
@@ -12,7 +12,7 @@ while j<width*height {
     j = j + 1
 }
 
-s=state+20
+s=state+78
 ^s='#'
 
 while i<height {

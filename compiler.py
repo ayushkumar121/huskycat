@@ -30,11 +30,13 @@ def compile_expression(value_stack: List, type_stack: List) -> str:
     return c_code
 
 
-def compile_program_partial(program: Program) -> str:
+def compile_operations(program: Program) -> str:
     c_code = ""
 
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
+
+    assert  len(OpType) == 10, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -94,6 +96,9 @@ def compile_program_partial(program: Program) -> str:
             c_code += "if("
             c_code += compile_expression(value_stack, type_stack)
             c_code += ")"
+
+        elif op.type == OpType.OpElse:
+            c_code += "else"
 
         elif op.type == OpType.OpWhile:
             c_code += "while("
@@ -168,7 +173,7 @@ void print_ptr(ptr a) {printf(\"^%lld\", a);}
 int main() {
 """
     c_code += f"byte global_memory[{program.global_memory}];\n"
-    c_code += compile_program_partial(program)
+    c_code += compile_operations(program)
     c_code += """return 0;
 }
 """

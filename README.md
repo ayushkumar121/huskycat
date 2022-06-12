@@ -7,8 +7,10 @@ Husky cat is a progarmming language
 
 ## Goals
 ---
-[.] Turning Complete
-[.] Easy to use
-[.] Compiled
-[.] Interpreted
-
+[x] Turning Complete  
+[x] Compiled  
+[x] Interpreted  
+[x] Static Typing  
+[.] Easy to use  
+[.] Polymorphism  
+[.] Module System

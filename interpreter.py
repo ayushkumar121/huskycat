@@ -76,6 +76,8 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
     value_stack = []
     ops_stack = []
 
+
+
     for token in eval_stack[::-1]:
         if str(token) == "(":
             ops_stack.append(token)
@@ -130,6 +132,8 @@ def interpret_program(program: Program):
 
     global_memory = bytearray(program.global_memory)
 
+    assert  len(OpType) == 10, "Exhaustive handling of operations"
+
     ip = 0
     while ip < len(program.operations):
         op = program.operations[ip]
@@ -149,7 +153,7 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpEndScope:
             scopes.pop()
-
+            
             if len(op.oprands) > 0:
                 ip = op.oprands[-1]
             else:
@@ -228,10 +232,18 @@ def interpret_program(program: Program):
                 value_stack, global_memory, op.file, op.line)
 
             if value_stack.pop() < 1:
-                ip += tj + 2
+                next_op = program.operations[ip + tj + 1]
+                if next_op.type == OpType.OpElse:
+                    ip += tj + 2
+                else:
+                    ip += tj + 1
             else:
                 ip += 1
 
+        elif op.type == OpType.OpElse:
+            tj = op.oprands[-1]
+            ip += tj + 1
+            
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]
 
@@ -239,7 +251,7 @@ def interpret_program(program: Program):
                 value_stack, global_memory, op.file, op.line)
 
             if value_stack.pop() < 1:
-                ip += tj + 2
+                ip += tj + 1
             else:
                 ip += 1
 

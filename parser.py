@@ -35,12 +35,15 @@ class OpType(Enum):
     # Jumps to end of the block if the condition pushed to slack is false
     OpIf = auto()
 
+    OpElse = auto()
+
     # Jumps back to while if condition is true or else jumps to end
     OpWhile = auto()
 
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
 
+    # TODO: Remove this
     OpGoto = auto()
     OpLabel = auto()
 
@@ -189,7 +192,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     word = ""
     operator = ""
 
-    for i,ch in enumerate(exp):
+    for i, ch in enumerate(exp):
 
         # Matching operators
         if ch in "=+-/*%()!&^|<>":
@@ -375,8 +378,8 @@ def parse_program_from_file(file_path) -> Program:
                 op_type = OpType.OpIf
 
                 for ip, op in enumerate(program.operations[::-1]):
-                    if op.type in [OpType.OpIf, OpType.OpWhile] and len(op.oprands) == 0:
-                        op.oprands.append(i)
+                    if op.type in [OpType.OpIf, OpType.OpWhile, OpType.OpElse] and len(op.oprands) == 0:
+                        op.oprands.append(i+1)
                         op_type = op.type
                         j = len(program.operations) - (ip + 1)
                         break
@@ -387,6 +390,9 @@ def parse_program_from_file(file_path) -> Program:
                 if op_type == OpType.OpWhile:
                     stack = [j - 1]
 
+                elif op_type == OpType.OpIf:
+                    stack = []
+                
                 program.operations.append(
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
@@ -403,6 +409,13 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, [], []))
 
+            elif re.fullmatch("else.*{", line):
+                program.operations.append(
+                    Operation(OpType.OpElse, file_path, line_num, [], []))
+
+                program.operations.append(
+                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+
             # Matching goto intrinsic
             elif re.fullmatch("goto .+", line):
                 exp: List[str] = re.findall("goto (.+)", line)
@@ -414,13 +427,13 @@ def parse_program_from_file(file_path) -> Program:
             elif re.fullmatch(":[a-zA-Z][a-zA-Z0-9_]*", line):
                 exp: List[str] = re.findall(":(.*)", line)
                 label = exp.pop()
-                
+
                 for ip, op in enumerate(program.operations[::-1]):
                     if op.type in [OpType.OpGoto] and op.oprands[-1] == label:
                         op.oprands.append(len(program.operations))
 
                 program.operations.append(
-                    Operation(OpType.OpLabel, file_path, line_num, [label], []))                       
+                    Operation(OpType.OpLabel, file_path, line_num, [label], []))
             # Other
             else:
                 print(f"{file_path}:{line_num}:")
