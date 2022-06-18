@@ -355,6 +355,36 @@ def parse_program_from_file(file_path) -> Program:
                 program.operations.append(
                     Operation(OpType.OpBeginScope, file_path, line_num, [], []))
 
+            # Matching elif keyword
+            elif re.fullmatch("elif .*{", line):
+                not_implemented("elif")
+
+            # Matching else keyword
+            elif re.fullmatch("else.*{", line):
+                skip = False
+                if_found = False
+                for op in program.operations[::-1]:
+                    if op.type == OpType.OpElse:
+                        skip = True
+                    elif op.type in [OpType.OpIf]:
+                        if not skip:
+                            if_found = True
+                            break
+                        
+                        skip = False
+
+                
+                if not if_found:
+                    print(f"{file_path}:{line_num}:")
+                    print(f"Parsing Error: unexpected else without if")
+                    exit(1)                                            
+
+                program.operations.append(
+                    Operation(OpType.OpElse, file_path, line_num, [], []))
+
+                program.operations.append(
+                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+
             # Matching while keyword
             elif re.fullmatch("while .*{", line):
                 tokens = re.findall("while (.*){", line)
@@ -392,7 +422,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 elif op_type == OpType.OpIf:
                     stack = []
-                
+
                 program.operations.append(
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
@@ -408,13 +438,6 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, [], []))
-
-            elif re.fullmatch("else.*{", line):
-                program.operations.append(
-                    Operation(OpType.OpElse, file_path, line_num, [], []))
-
-                program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
 
             # Matching goto intrinsic
             elif re.fullmatch("goto .+", line):
@@ -434,6 +457,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpLabel, file_path, line_num, [label], []))
+            
             # Other
             else:
                 print(f"{file_path}:{line_num}:")

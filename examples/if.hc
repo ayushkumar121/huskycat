@@ -1,8 +1,12 @@
-if 1<2 {
-    print 20
-} 
-else{
-    print 30
+if 2<1 {
+    print 1
 }
-print 10
+else{
+    print 3
+}
+else{
+    print 4
+}
+
+print 5
 print '\n'

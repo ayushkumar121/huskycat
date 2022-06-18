@@ -241,9 +241,12 @@ def interpret_program(program: Program):
                 ip += 1
 
         elif op.type == OpType.OpElse:
-            tj = op.oprands[-1]
-            ip += tj + 1
-            
+            if len(op.oprands) > 0:
+                tj = op.oprands[-1]
+                ip += tj + 1
+            else:
+                ip += 1
+        
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]
 
