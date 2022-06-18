@@ -46,10 +46,6 @@ class OpType(Enum):
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
 
-    # TODO: Remove this
-    OpGoto = auto()
-    OpLabel = auto()
-
 
 @dataclass
 class Operation:
@@ -486,26 +482,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, [], []))
-
-            # Matching goto intrinsic
-            elif re.fullmatch("goto .+", line):
-                exp: List[str] = re.findall("goto (.+)", line)
-
-                program.operations.append(
-                    Operation(OpType.OpGoto, file_path, line_num, [exp.pop()], []))
-
-            # Matching goto intrinsic
-            elif re.fullmatch(":[a-zA-Z][a-zA-Z0-9_]*", line):
-                exp: List[str] = re.findall(":(.*)", line)
-                label = exp.pop()
-
-                for ip, op in enumerate(program.operations[::-1]):
-                    if op.type in [OpType.OpGoto] and op.oprands[-1] == label:
-                        op.oprands.append(len(program.operations))
-
-                program.operations.append(
-                    Operation(OpType.OpLabel, file_path, line_num, [label], []))
-            
+          
             # Other
             else:
                 print(f"{file_path}:{line_num}:")

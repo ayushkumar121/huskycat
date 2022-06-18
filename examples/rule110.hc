@@ -1,5 +1,5 @@
 
-width:i64=80
+width:i64=40
 height:i64=30
 state:ptr=resb 2400
 s:ptr=state
@@ -12,7 +12,7 @@ while j<width*height {
     j = j + 1
 }
 
-s=state+78
+s=state+38
 ^s='#'
 
 while i<height {
@@ -39,66 +39,57 @@ while i<height {
         if (^s1 == '#')&&(^s2 == '#')&&(^s3 == '#')  {
             s2=state+j+1 + (i+1)*width
             ^s2='_'
-
-            goto short_circuit      
         }
     
         // 110 => 1
-        if (^s1 == '#')&&(^s2 == '#')&&(^s3 == '_')  {
+        else if (^s1 == '#')&&(^s2 == '#')&&(^s3 == '_')  {
             s2=state+j+1 + (i+1)*width
             ^s2='#'
 
-            goto short_circuit      
         }
    
         // 101 => 1
-        if (^s1 == '#')&&(^s2 == '_')&&(^s3 == '#')  {
+        else if (^s1 == '#')&&(^s2 == '_')&&(^s3 == '#')  {
             s2=state+j+1 + (i+1)*width
             ^s2='#'
 
-            goto short_circuit      
         }
 
         // 100 => 0
-        if (^s1 == '#')&&(^s2 == '_')&&(^s3 == '_')  {
+        else if (^s1 == '#')&&(^s2 == '_')&&(^s3 == '_')  {
             s2=state+j+1 + (i+1)*width
             ^s2='_'
 
-            goto short_circuit
         }
 
         // 011 => 1
-        if (^s1 == '_')&&(^s2 == '#')&&(^s3 == '#')  {
+        else if (^s1 == '_')&&(^s2 == '#')&&(^s3 == '#')  {
             s2=state+j+1 + (i+1)*width
             ^s2='#'
 
-            goto short_circuit
         }
 
         // 010 => 1
-        if (^s1 == '_')&&(^s2 == '#')&&(^s3 == '_')  {
+        else if (^s1 == '_')&&(^s2 == '#')&&(^s3 == '_')  {
             s2=state+j+1 + (i+1)*width
             ^s2='#'
         
-            goto short_circuit
         }
         
         // 001 => 1
-        if (^s1 == '_')&&(^s2 == '_')&&(^s3 == '#')  {
+        else if (^s1 == '_')&&(^s2 == '_')&&(^s3 == '#')  {
             s2=state+j+1 + (i+1)*width
             ^s2='#'
             
-            goto short_circuit
         }
 
         // 000 => 0
-        if (^s1 == '_')&&(^s2 == '_')&&(^s3 == '_')  {
+        else if (^s1 == '_')&&(^s2 == '_')&&(^s3 == '_')  {
             s2=state+j+1 + (i+1)*width
             ^s2='_'
 
-            goto short_circuit
         }
-:short_circuit
+
         j = j + 1
     }
     

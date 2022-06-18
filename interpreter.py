@@ -132,10 +132,11 @@ def interpret_program(program: Program):
 
     global_memory = bytearray(program.global_memory)
 
-    assert  len(OpType) == 11, "Exhaustive handling of operations"
+    assert  len(OpType) == 9, "Exhaustive handling of operations"
 
     skip_elseif_else = False 
     ip = 0
+
     while ip < len(program.operations):
         op = program.operations[ip]
 
@@ -298,8 +299,3 @@ def interpret_program(program: Program):
 
             ip += 1
 
-        elif op.type == OpType.OpGoto:
-            ip = op.oprands[-1]
-
-        elif op.type == OpType.OpLabel:
-            ip += 1

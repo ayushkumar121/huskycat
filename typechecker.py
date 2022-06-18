@@ -83,7 +83,7 @@ def typecheck_program(program: Program):
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
-    assert  len(OpType) == 11, "Exhaustive handling of operations"
+    assert  len(OpType) == 9, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -189,8 +189,3 @@ def typecheck_program(program: Program):
 
             op.types.append(type_stack.pop())
         
-        elif op.type == OpType.OpGoto:
-            pass
-
-        elif op.type == OpType.OpLabel:
-            pass
