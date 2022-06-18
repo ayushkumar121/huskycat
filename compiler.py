@@ -36,7 +36,7 @@ def compile_operations(program: Program) -> str:
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
-    assert  len(OpType) == 10, "Exhaustive handling of operations"
+    assert  len(OpType) == 11, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -96,6 +96,12 @@ def compile_operations(program: Program) -> str:
             c_code += "if("
             c_code += compile_expression(value_stack, type_stack)
             c_code += ")"
+
+        elif op.type == OpType.OpElseIf:
+            c_code += "else if("
+            c_code += compile_expression(value_stack, type_stack)
+            c_code += ")"
+
 
         elif op.type == OpType.OpElse:
             c_code += "else"

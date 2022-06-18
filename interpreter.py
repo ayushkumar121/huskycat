@@ -132,8 +132,9 @@ def interpret_program(program: Program):
 
     global_memory = bytearray(program.global_memory)
 
-    assert  len(OpType) == 10, "Exhaustive handling of operations"
+    assert  len(OpType) == 11, "Exhaustive handling of operations"
 
+    skip_elseif_else = False 
     ip = 0
     while ip < len(program.operations):
         op = program.operations[ip]
@@ -232,20 +233,37 @@ def interpret_program(program: Program):
                 value_stack, global_memory, op.file, op.line)
 
             if value_stack.pop() < 1:
-                next_op = program.operations[ip + tj + 1]
-                if next_op.type == OpType.OpElse:
-                    ip += tj + 2
-                else:
-                    ip += tj + 1
+                skip_elseif_else = False
+                ip += tj + 1
             else:
+                skip_elseif_else = True
+                ip += 1
+
+        elif op.type == OpType.OpElseIf:
+            if skip_elseif_else:
+                tj = op.oprands[-1]
+                ip += tj + 1
+                continue
+
+            tj = op.oprands[-1]
+
+            value_stack = evaluate_stack(
+                value_stack, global_memory, op.file, op.line)
+
+            if value_stack.pop() < 1:
+                skip_elseif_else = False
+                ip += tj + 1
+            else:
+                skip_elseif_else = True
                 ip += 1
 
         elif op.type == OpType.OpElse:
-            if len(op.oprands) > 0:
+            if skip_elseif_else:
                 tj = op.oprands[-1]
                 ip += tj + 1
-            else:
-                ip += 1
+                continue
+
+            ip += 1
         
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]

@@ -35,6 +35,9 @@ class OpType(Enum):
     # Jumps to end of the block if the condition pushed to slack is false
     OpIf = auto()
 
+    OpElseIf = auto()
+    
+    # Jumps to end of the block body
     OpElse = auto()
 
     # Jumps back to while if condition is true or else jumps to end
@@ -338,7 +341,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpMov, file_path, line_num, [deref, var_name], [var_type]))
-
+ 
             # Matching if keyword
             elif re.fullmatch("if .*{", line):
                 tokens = re.findall("if (.*){", line)
@@ -356,24 +359,69 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpBeginScope, file_path, line_num, [], []))
 
             # Matching elif keyword
-            elif re.fullmatch("elif .*{", line):
-                not_implemented("elif")
+            elif re.fullmatch("else if .*{", line):
+                top_op = program.operations[-1]
 
-            # Matching else keyword
-            elif re.fullmatch("else.*{", line):
+                if top_op.type != OpType.OpEndScope:
+                    print(f"{file_path}:{line_num}:")
+                    print(f"Parsing Error: unexpected expression else if")
+                    exit(1)                                            
+                 
+
                 skip = False
                 if_found = False
                 for op in program.operations[::-1]:
                     if op.type == OpType.OpElse:
                         skip = True
-                    elif op.type in [OpType.OpIf]:
+                    elif op.type == OpType.OpIf:
                         if not skip:
                             if_found = True
                             break
                         
                         skip = False
 
+                if not if_found:
+                    print(f"{file_path}:{line_num}:")
+                    print(f"Parsing Error: unexpected else if without if")
+                    exit(1)                                            
+
+
+                tokens = re.findall("else if (.*){", line)
+
+                eval_stack, types = parse_expression(
+                    tokens.pop(), program, file_path, line_num)
+
+                program.operations.append(
+                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+
+                program.operations.append(
+                    Operation(OpType.OpElseIf, file_path, line_num, [], []))
+
+                program.operations.append(
+                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+
+            # Matching else keyword
+            elif re.fullmatch("else.*{", line):
                 
+                top_op = program.operations[-1]
+
+                if top_op.type != OpType.OpEndScope:
+                    print(f"{file_path}:{line_num}:")
+                    print(f"Parsing Error: unexpected expression else")
+                    exit(1)            
+
+                skip = False
+                if_found = False
+                for op in program.operations[::-1]:
+                    if op.type == OpType.OpElse:
+                        skip = True
+                    elif op.type == OpType.OpIf:
+                        if not skip:
+                            if_found = True
+                            break
+                        
+                        skip = False
+
                 if not if_found:
                     print(f"{file_path}:{line_num}:")
                     print(f"Parsing Error: unexpected else without if")
@@ -408,7 +456,7 @@ def parse_program_from_file(file_path) -> Program:
                 op_type = OpType.OpIf
 
                 for ip, op in enumerate(program.operations[::-1]):
-                    if op.type in [OpType.OpIf, OpType.OpWhile, OpType.OpElse] and len(op.oprands) == 0:
+                    if op.type in [OpType.OpIf, OpType.OpWhile, OpType.OpElseIf, OpType.OpElse] and len(op.oprands) == 0:
                         op.oprands.append(i+1)
                         op_type = op.type
                         j = len(program.operations) - (ip + 1)
@@ -468,4 +516,5 @@ def parse_program_from_file(file_path) -> Program:
         program.operations.append(
             Operation(OpType.OpEndScope, file_path, len(lines), [], []))
 
+    # not_implemented("else if parsing")
     return program

@@ -83,7 +83,7 @@ def typecheck_program(program: Program):
     type_stack: List[Primitives] = []
     value_stack: List[int | str] = []
 
-    assert  len(OpType) == 10, "Exhaustive handling of operations"
+    assert  len(OpType) == 11, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -144,6 +144,22 @@ def typecheck_program(program: Program):
                     f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool} found {found}")
                 exit(1)
 
+        elif op.type == OpType.OpElseIf:
+            if len(type_stack) == 0:
+                print(f"{op.file}:{op.line}:")
+                print(f"Typecheck error: attempting to typecheck an empty typestack")
+                exit(1)
+
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, op.file, op.line)
+
+            value_stack.pop()
+            found = type_stack.pop()
+            if found != Primitives.Bool:
+                print(f"{op.file}:{op.line}:")
+                print(
+                    f"Typecheck error: unexpected type on else if expression, expected {Primitives.Bool} found {found}")
+                exit(1)
 
         elif op.type == OpType.OpElse:
             pass
