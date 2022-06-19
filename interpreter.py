@@ -1,27 +1,16 @@
 from dataclasses import dataclass
-from pprint import pprint
-from typing import List, Type
-from misc import not_implemented, operator_predence, operator_list, binary_operators, unary_operators
-from parser import OpType, Primitives, Program
+from typing import List
+from misc import operator_predence, operator_list, binary_operators, unary_operators
+from parser import OpType, Program
+from static_types import Primitives, TypedPtr, Types, type_str, size_of_primitive
 
 
 @dataclass
 class Var:
     name: str
-    type: Primitives
+    type: Types
     size: int
     value: bytes
-
-
-def size_of(primitive: Primitives) -> int:
-    if primitive in [Primitives.I32, Primitives.F32]:
-        return 4
-    elif primitive in [Primitives.I64, Primitives.F64, Primitives.Ptr]:
-        return 8
-    elif primitive in [Primitives.Bool, Primitives.Byte]:
-        return 1
-
-    return 8
 
 
 def apply_op_binary(a: int, b: int, op: str, global_memory: bytearray) -> int:
@@ -75,8 +64,6 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], global_memo
 def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: str, line: int) -> tuple[List[int]]:
     value_stack = []
     ops_stack = []
-
-
 
     for token in eval_stack[::-1]:
         if str(token) == "(":
@@ -132,9 +119,9 @@ def interpret_program(program: Program):
 
     global_memory = bytearray(program.global_memory)
 
-    assert  len(OpType) == 9, "Exhaustive handling of operations"
+    assert len(OpType) == 9, "Exhaustive handling of operations"
 
-    skip_elseif_else = False 
+    skip_elseif_else = False
     ip = 0
 
     while ip < len(program.operations):
@@ -147,15 +134,23 @@ def interpret_program(program: Program):
                 var = opr
                 tp = op.types[len(op.oprands) - (opi+1)]
 
-                vars.append(Var(var, tp, size_of(
-                    tp), bytearray(size_of(tp))))
-
+                if type(tp) == Primitives:
+                    vars.append(Var(var, tp, size_of_primitive(
+                        tp), bytearray(size_of_primitive(tp))))
+                elif type(tp) == TypedPtr:
+                    vars.append(Var(var, tp, size_of_primitive(Primitives.Ptr),
+                                    bytearray(size_of_primitive(Primitives.Ptr))))
+                else:
+                    print(f"{op.file}:{op.line}:")
+                    print(
+                        f"Interpreter Error : definition of type {type_str(tp)} not defined")
+                    exit(1)
             scopes.append(vars)
             ip += 1
 
         elif op.type == OpType.OpEndScope:
             scopes.pop()
-            
+
             if len(op.oprands) > 0:
                 ip = op.oprands[-1]
             else:
@@ -177,6 +172,10 @@ def interpret_program(program: Program):
                             scopes[i][j].value, "big")
                     elif tp in [Primitives.F32, Primitives.F64]:
                         val = float.from_bytes(
+                            scopes[i][j].value, "big")
+
+                    elif type(tp) == TypedPtr:
+                        val = int.from_bytes(
                             scopes[i][j].value, "big")
                     else:
                         print(f"{op.file}:{op.line}:")
@@ -213,16 +212,19 @@ def interpret_program(program: Program):
 
             elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
-                    size_of(tp), "big")
+                    size_of_primitive(tp), "big")
 
             elif tp in [Primitives.F32, Primitives.F64]:
                 scopes[i][j].value = float(value_stack.pop()).to_bytes(
-                    size_of(tp), "big")
+                    size_of_primitive(tp), "big")
 
+            elif type(tp) == TypedPtr:
+                scopes[i][j].value = int(value_stack.pop()).to_bytes(
+                    size_of_primitive(Primitives.Ptr), "big")
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Interpreter Error : assignment for this type not defined")
+                    f"Interpreter Error : assignment for this type {type_str(tp)} not defined")
                 exit(1)
 
             ip += 1
@@ -265,7 +267,7 @@ def interpret_program(program: Program):
                 continue
 
             ip += 1
-        
+
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]
 
@@ -290,7 +292,9 @@ def interpret_program(program: Program):
             elif tp == Primitives.Bool:
                 print("true" if value_stack.pop() == 1 else "false", end="")
             elif tp == Primitives.Ptr:
-                print(f"^{value_stack.pop()}", end="")
+                print(f"^({value_stack.pop()})", end="")
+            elif type(tp) == TypedPtr:
+                print(f"^{type_str(tp.primitive)}({value_stack.pop()})", end="")
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -298,4 +302,3 @@ def interpret_program(program: Program):
                 exit(1)
 
             ip += 1
-

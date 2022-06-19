@@ -1,11 +1,7 @@
 from pprint import pprint
 from typing import List
-from parser import OpType, Primitives, Program
-
-# def substitute_symbols(a:str) -> str:
-#     if a == "^":
-#         return "global_memory+"
-#     return a
+from parser import OpType, Program
+from static_types import Primitives, TypedPtr, Types, type_str
 
 
 def compile_expression(value_stack: List, type_stack: List) -> str:
@@ -33,10 +29,10 @@ def compile_expression(value_stack: List, type_stack: List) -> str:
 def compile_operations(program: Program) -> str:
     c_code = ""
 
-    type_stack: List[Primitives] = []
+    type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
-    assert  len(OpType) == 9, "Exhaustive handling of operations"
+    assert len(OpType) == 9, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -45,26 +41,30 @@ def compile_operations(program: Program) -> str:
 
             while len(op.oprands) > 0:
                 var = op.oprands.pop()
-                type = op.types.pop()
+                tp = op.types.pop()
 
-                if type == Primitives.I32:
+                if tp == Primitives.I32:
                     c_code += f"i32 {var};\n"
-                elif type == Primitives.I64:
+                elif tp == Primitives.I64:
                     c_code += f"i64 {var};\n"
-                elif type == Primitives.F32:
+                elif tp == Primitives.F32:
                     c_code += f"f32 {var};\n"
-                elif type == Primitives.F64:
+                elif tp == Primitives.F64:
                     c_code += f"f64 {var};\n"
-                elif type == Primitives.Bool:
+                elif tp == Primitives.Bool:
                     c_code += f"bool {var};\n"
-                elif type == Primitives.Byte:
+                elif tp == Primitives.Byte:
                     c_code += f"byte {var};\n"
-                elif type == Primitives.Ptr:
+                elif tp == Primitives.Ptr:
+                    c_code += f"ptr {var};\n"
+                elif tp == Primitives.Ptr:
+                    c_code += f"ptr {var};\n"
+                elif type(tp) == TypedPtr:
                     c_code += f"ptr {var};\n"
                 else:
                     print(f"{op.file}:{op.line}:")
                     print(
-                        f"Compiler Error : type not defined for compilation")
+                        f"Compiler Error : type {type_str(tp)} not defined for compilation")
                     exit(1)
 
         elif op.type == OpType.OpEndScope:
@@ -102,7 +102,6 @@ def compile_operations(program: Program) -> str:
             c_code += compile_expression(value_stack, type_stack)
             c_code += ")"
 
-
         elif op.type == OpType.OpElse:
             c_code += "else"
 
@@ -128,7 +127,9 @@ def compile_operations(program: Program) -> str:
             elif tp == Primitives.Byte:
                 c_code += f"print_byte("
             elif tp == Primitives.Ptr:
-                c_code += f"print_ptr("
+                c_code += f"print_ptr(\"\", "            
+            elif type(tp) == TypedPtr:
+                c_code += f"print_ptr(\"{type_str(tp.primitive)}\", "
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -166,7 +167,7 @@ void print_f64(f64 a) {printf(\"%lf\", a);}
 void print_bool(bool a) {printf(\"%s\", a?"true":"false");}
 void print_byte(byte a) {printf(\"%c\", a);}
 
-void print_ptr(ptr a) {printf(\"^%lld\", a);}
+void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
 
 int main() {
 """

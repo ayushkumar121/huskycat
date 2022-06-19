@@ -4,19 +4,7 @@ import re
 from typing import List
 
 from misc import not_implemented, operator_list
-
-
-class Primitives(Enum):
-    Byte = auto()
-    I32 = auto()
-    I64 = auto()
-    F32 = auto()
-    F64 = auto()
-    Bool = auto()
-    Ptr = auto()
-    Operator = auto()
-    Unknown = auto()
-
+from static_types import Primitives, TypedPtr, Types
 
 class OpType(Enum):
 
@@ -53,7 +41,7 @@ class Operation:
     file: str
     line: int
     oprands: List[int | str]  # they can be both integers and string atm
-    types: List[Primitives]
+    types: List[Types]
 
 
 @dataclass
@@ -133,7 +121,7 @@ def parse_bool_literal(symbol: str) -> tuple[int, bool]:
     return 0, False
 
 
-def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
+def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Types]:
     word = word.strip()
 
     num, is_int = parse_int_literal(word)
@@ -147,6 +135,31 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
     # Match bool literals
     elif is_bool_literal:
         return what_bool, Primitives.Bool
+    
+    # Match structs
+    elif re.fullmatch(".*\{.*\}", word):
+        tokens: List[tuple] = re.findall("(.*)\{(.*)\}", word)
+        tp = tokens.pop()
+
+        # TODO: parse what's inside struct
+
+        if len(tp) != 2:
+            print(
+                f"{file}:{line}:")
+            print(
+                f"Parsing Error : no type found for struct")
+            exit(1)
+
+
+        primitive =  parse_primitives(tp[0])
+        if primitive == Primitives.Unknown:
+            print(
+                f"{file}:{line}:")
+            print(
+                f"Parsing Error : unknown type `{tp[0]}`")
+            exit(1)
+
+        return 0, TypedPtr(primitive)
 
     # Match characters
     elif re.fullmatch("'\\\?.'", word):
@@ -184,7 +197,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         exit(1)
 
 
-def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Primitives]]:
+def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Types]]:
     eval_stack: List[int | str] = []
     type_stack: List[Primitives] = []
 
@@ -227,7 +240,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
 
 
 # TODO: implement const eval
-def const_eval(exp: str, program: Program, file: str, line: int) -> tuple[int | str, Primitives]:
+def const_eval(exp: str, program: Program, file: str, line: int) -> tuple[int | str, Types]:
     value, val_type = parse_word(exp, program, file, line)
 
     if type(value) != type(0):
@@ -259,7 +272,7 @@ def parse_program_from_file(file_path) -> Program:
                 continue
 
             #  Matching Assignments
-            elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
+            elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?\^?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
                 deref = False
                 tokens = re.split("[ ]*=[ ]*", line)
 
@@ -309,11 +322,22 @@ def parse_program_from_file(file_path) -> Program:
                             f"Parsing Error: expected type when declaring a variable")
                         exit(1)
 
-                    var_type = parse_primitives(var_info[1])
+                    if var_info[1][0] == "^":                     
+                        primitive = parse_primitives(var_info[1][1:])
+
+                        if primitive == Primitives.Unknown:
+                            print(f"{file_path}:{line_num}:")
+                            print(f"Parsing Error: unknown type `{var_info[1]}`")
+                            exit(1)
+
+                        var_type = TypedPtr(primitive)
+                    else:
+                        var_type = parse_primitives(var_info[1])
+
 
                     if var_type == Primitives.Unknown:
                         print(f"{file_path}:{line_num}:")
-                        print(f"Parsing Error: unkown type `{var_info[1]}`")
+                        print(f"Parsing Error: unknown type `{var_info[1]}`")
                         exit(1)
 
                     i = find_local_scope(program)

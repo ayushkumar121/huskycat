@@ -1,9 +1,9 @@
 from typing import List
-from misc import not_implemented, operator_predence, operator_list, binary_operators, unary_operators
-from parser import OpType, Primitives, Program
+from misc import operator_predence, operator_list, binary_operators, unary_operators
+from parser import OpType, Program
+from static_types import Primitives, Types, type_str
 
-
-def apply_op_binary(a: Primitives, b: Primitives, op: str) -> Primitives:
+def apply_op_binary(a: Types, b: Types, op: str) -> Types:
     if op in ["+",  "-", "*", "/"]:
         return b
     elif op == "%":
@@ -14,7 +14,7 @@ def apply_op_binary(a: Primitives, b: Primitives, op: str) -> Primitives:
     return Primitives.Unknown
 
 
-def apply_op_uinary(a: int, op: str) -> Primitives:
+def apply_op_uinary(a: int, op: str) -> Types:
     if op == "!":
         return Primitives.Bool
     elif op == "^":
@@ -23,7 +23,7 @@ def apply_op_uinary(a: int, op: str) -> Primitives:
     return Primitives.Unknown
 
 
-def evaluate_operation(type_stack: List[Primitives], ops_stack: List[str], file: str, line: int):
+def evaluate_operation(type_stack: List[Types], ops_stack: List[str], file: str, line: int):
     op = ops_stack.pop()
 
     # Binary operators
@@ -40,8 +40,8 @@ def evaluate_operation(type_stack: List[Primitives], ops_stack: List[str], file:
 
 
 def evaluate_stack(eval_stack: List[int | str],
-                   types: List[Primitives],
-                   file: str, line: int) -> tuple[List[int], List[Primitives]]:
+                   types: List[Types],
+                   file: str, line: int) -> tuple[List[int], List[Types]]:
 
     type_stack: List[Primitives] = []
     ops_stack: List[str] = []
@@ -80,7 +80,7 @@ def evaluate_stack(eval_stack: List[int | str],
 
 
 def typecheck_program(program: Program):
-    type_stack: List[Primitives] = []
+    type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
     assert  len(OpType) == 9, "Exhaustive handling of operations"
@@ -124,7 +124,7 @@ def typecheck_program(program: Program):
             if tp != found:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: mismatch type on assignment, expected {tp} found {found}")
+                    f"Typecheck error: mismatch type on assignment, expected `{type_str(tp)}` found `{type_str(found)}`")
                 exit(1)
 
         elif op.type == OpType.OpIf:
@@ -141,7 +141,7 @@ def typecheck_program(program: Program):
             if found != Primitives.Bool:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: unexpected type on if expression, expected {Primitives.Bool} found {found}")
+                    f"Typecheck error: unexpected type on if expression, expected `bool` found `{type_str(found)}")
                 exit(1)
 
         elif op.type == OpType.OpElseIf:
@@ -158,7 +158,7 @@ def typecheck_program(program: Program):
             if found != Primitives.Bool:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: unexpected type on else if expression, expected {Primitives.Bool} found {found}")
+                    f"Typecheck error: unexpected type on else if expression, expected `bool` found `{type_str(found)}`")
                 exit(1)
 
         elif op.type == OpType.OpElse:
@@ -178,7 +178,7 @@ def typecheck_program(program: Program):
             if found != Primitives.Bool:
                 print(f"{op.file}:{op.line}:")
                 print(
-                    f"Typecheck error: unexpected type on while expression, expected {Primitives.Bool} found {found}")
+                    f"Typecheck error: unexpected type on while expression, expected `bool` found `{type_str(found)}")
                 exit(1)
 
         elif op.type == OpType.OpPrint:
