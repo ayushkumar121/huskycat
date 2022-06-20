@@ -280,6 +280,46 @@ def parse_program_from_file(file_path) -> Program:
             if line == "":
                 continue
 
+            #  Matching Declaration
+            elif re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*:\^?[a-zA-Z][a-zA-Z0-9]*", line):
+                tokens = re.split(":", line)
+
+                var_name = tokens[0]
+                var_tp = tokens[1]
+
+                i, j = find_scope_with_symbol(var_name, program)
+
+                var_type = Primitives.Unknown
+
+                if i == -1:
+                    if var_tp[0] == "^":                     
+                        primitive = parse_primitives(var_tp[1:])
+
+                        if primitive == Primitives.Unknown:
+                            print(f"{file_path}:{line_num}:")
+                            print(f"Parsing Error: unknown type `{var_tp}`")
+                            exit(1)
+
+                        var_type = TypedPtr(primitive)
+                    else:
+                        var_type = parse_primitives(var_tp)
+                        pass
+
+
+                    if var_type == Primitives.Unknown:
+                        print(f"{file_path}:{line_num}:")
+                        print(f"Parsing Error: unknown type `{var_tp}`")
+                        exit(1)
+
+                    i = find_local_scope(program)
+
+                    program.operations[i].oprands.append(var_name)
+                    program.operations[i].types.append(var_type)
+                else:
+                    print(f"{file_path}:{line_num}:")
+                    print(f"Parsing Error: variable `{var_tp}` already declared")
+                    exit(1)
+
             #  Matching Assignments
             elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?\^?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
                 deref = False

@@ -229,18 +229,24 @@ def interpret_program(program: Program):
                 deref_index = int.from_bytes(
                     scopes[i][j].value, "big")
 
-                if deref_index > program.global_memory - 1:
-                    print(f"{op.file}:{op.line}:")
-                    print(
-                        f"Interpreter Error : cannot access more memory than allocated")
-                    exit(1)
-
                 if type(tp) == TypedPtr:
+                    if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory - 1:
+                        print(f"{op.file}:{op.line}:")
+                        print(
+                        f"Interpreter Error : trying to access unallocated memory")
+                        exit(1)
+
                     bts = int(value_stack.pop()).to_bytes(
                         size_of_primitive(tp.primitive), "big")
                     for i, bt in enumerate(bts):
                         global_memory[deref_index + i] = bt
                 else:
+                    if deref_index > program.global_memory - 1:
+                        print(f"{op.file}:{op.line}:")
+                        print(
+                        f"Interpreter Error : trying to access unallocated memory")
+                        exit(1)
+
                     global_memory[deref_index] = int(value_stack.pop())
 
             elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
