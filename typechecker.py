@@ -3,7 +3,7 @@ from misc import operator_predence, operator_list, binary_operators, unary_opera
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str
 
-def apply_op_binary(a: Types, b: Types, op: str) -> Types:
+def apply_op_binary_on_types(a: Types, b: Types, op: str) -> Types:
     if op in ["+",  "-", "*", "/"]:
         return b
     elif op == "%":
@@ -14,7 +14,7 @@ def apply_op_binary(a: Types, b: Types, op: str) -> Types:
     return Primitives.Unknown
 
 
-def apply_op_uinary(a: Types, op: str) -> Types:
+def apply_op_uinary_on_types(a: Types, op: str) -> Types:
     if op == "!":
         return Primitives.Bool
     elif op == "^":
@@ -31,12 +31,12 @@ def evaluate_operation(type_stack: List[Types], ops_stack: List[str], file: str,
         a = type_stack.pop()
         b = type_stack.pop()
 
-        type_stack.append(apply_op_binary(a, b, op))
+        type_stack.append(apply_op_binary_on_types(a, b, op))
 
     # Uninary operators
     elif op in unary_operators:
         a = type_stack.pop()
-        type_stack.append(apply_op_uinary(a, op))
+        type_stack.append(apply_op_uinary_on_types(a, op))
 
 
 def evaluate_stack(eval_stack: List[int | str],

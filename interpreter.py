@@ -3,6 +3,7 @@ from typing import List
 from misc import operator_predence, operator_list, binary_operators, unary_operators
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str, size_of_primitive
+from typechecker import apply_op_binary_on_types, apply_op_uinary_on_types
 
 
 @dataclass
@@ -13,7 +14,7 @@ class Var:
     value: bytes
 
 
-def apply_op_binary(a: int, b: int, op: str, global_memory: bytearray) -> int:
+def apply_op_binary(a: int, b: int, op: str, tps: List[Types], global_memory: bytearray) -> int:
     if op == "+":
         return b + a
     elif op == "-":
@@ -37,35 +38,50 @@ def apply_op_binary(a: int, b: int, op: str, global_memory: bytearray) -> int:
     return 0
 
 
-def apply_op_uinary(a: int, op: str, global_memory: bytearray) -> int:
+def apply_op_uinary(a: int, op: str, tp: Types, global_memory: bytearray) -> int:
     if op == "!":
         return 1 if (not a) else 0
     elif op == "^":
-        return global_memory[a]
+        if type(tp) == TypedPtr:
+            return int.from_bytes(global_memory[a:a+size_of_primitive(tp.primitive)], "big")
+        else:
+            return global_memory[a]
     return 0
 
 
-def evaluate_operation(value_stack: List[int], ops_stack: List[str], global_memory: bytearray, file: str, line: int):
+def evaluate_operation(value_stack: List[int], ops_stack: List[str], tp_stack: List[Types], global_memory: bytearray, file: str, line: int):
     op = ops_stack.pop()
 
     # Binary operators
     if op in binary_operators:
         a = value_stack.pop()
-        b = value_stack.pop()
+        a_tp = tp_stack.pop()
 
-        value_stack.append(apply_op_binary(a, b, op, global_memory))
+        b = value_stack.pop()
+        b_tp = tp_stack.pop()
+
+        value_stack.append(apply_op_binary(
+            a, b, op, [a_tp, b_tp], tp_stack, global_memory))
+        tp_stack.append(apply_op_binary_on_types(a_tp, b_tp, op))
 
     # Uninary operators
     elif op in unary_operators:
         a = value_stack.pop()
-        value_stack.append(apply_op_uinary(a, op, global_memory))
+        a_tp = tp_stack.pop()
+
+        value_stack.append(apply_op_uinary(a, op, a_tp, global_memory))
+        tp_stack.append(apply_op_uinary_on_types(a_tp, op))
 
 
-def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: str, line: int) -> tuple[List[int]]:
+def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types], global_memory: bytearray, file: str, line: int) -> tuple[List[int], List[Types]]:
+    l = len(type_stack)
+
+    tp_stack = []
     value_stack = []
     ops_stack = []
 
-    for token in eval_stack[::-1]:
+    for i, token in enumerate(eval_stack[::-1]):
+
         if str(token) == "(":
             ops_stack.append(token)
 
@@ -79,13 +95,15 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
 
         elif str(token) in operator_list:
             while len(ops_stack) > 0 and operator_predence(ops_stack[-1]) >= operator_predence(token):
-                evaluate_operation(value_stack, ops_stack,
+                evaluate_operation(value_stack, ops_stack, tp_stack,
                                    global_memory, file, line)
 
             ops_stack.append(token)
 
         elif type(token) == type(0):
             value_stack.append(token)
+            tp_stack.append(type_stack[l - (i+1)])
+
         else:
             print(f"{file}:{line}:")
             print(
@@ -93,15 +111,17 @@ def evaluate_stack(eval_stack: List[int | str], global_memory: bytearray, file: 
             exit(1)
 
     while len(ops_stack) > 0:
-        evaluate_operation(value_stack, ops_stack, global_memory, file, line)
+        evaluate_operation(value_stack, ops_stack, tp_stack,
+                           global_memory, file, line)
 
-    if len(value_stack) != 1:
+    if len(value_stack) != 1 or len(tp_stack) != 1:
+        print(value_stack, tp_stack)
         print(f"{file}:{line}:")
         print(
             f"Interpreter Error : unable to evalution following stack {eval_stack}")
         exit(1)
 
-    return value_stack
+    return value_stack, tp_stack
 
 
 def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
@@ -114,6 +134,8 @@ def find_var_scope(var: str, scopes: List[List[Var]]) -> tuple[int, int]:
 
 
 def interpret_program(program: Program):
+
+    type_stack: List[Types] = []
     value_stack: List[int | str] = []
     scopes: List[List[Var]] = []
 
@@ -158,13 +180,14 @@ def interpret_program(program: Program):
 
         elif op.type == OpType.OpPush:
             value_stack = []
+            type_stack = []
 
             for opr in op.oprands[::-1]:
                 i, j = find_var_scope(opr, scopes)
+                tp = scopes[i][j].type
 
                 if i != -1:
                     val = 0
-                    tp = scopes[i][j].type
 
                     if tp in [Primitives.I32, Primitives.I64, Primitives.Byte,
                               Primitives.Bool, Primitives.Ptr]:
@@ -187,6 +210,8 @@ def interpret_program(program: Program):
                 else:
                     value_stack.append(opr)
 
+                type_stack.append(tp)
+
             ip += 1
 
         elif op.type == OpType.OpMov:
@@ -194,9 +219,11 @@ def interpret_program(program: Program):
             deref = op.oprands[-2]
             tp = op.types[-1]
 
-            value_stack = evaluate_stack(
-                value_stack, global_memory, op.file, op.line)
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, global_memory, op.file, op.line)
             i, j = find_var_scope(var, scopes)
+
+            type_stack.pop()
 
             if deref:
                 deref_index = int.from_bytes(
@@ -208,7 +235,13 @@ def interpret_program(program: Program):
                         f"Interpreter Error : cannot access more memory than allocated")
                     exit(1)
 
-                global_memory[deref_index] = int(value_stack.pop())
+                if type(tp) == TypedPtr:
+                    bts = int(value_stack.pop()).to_bytes(
+                        size_of_primitive(tp.primitive), "big")
+                    for i, bt in enumerate(bts):
+                        global_memory[deref_index + i] = bt
+                else:
+                    global_memory[deref_index] = int(value_stack.pop())
 
             elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
@@ -232,8 +265,10 @@ def interpret_program(program: Program):
         elif op.type == OpType.OpIf:
             tj = op.oprands[-1]
 
-            value_stack = evaluate_stack(
-                value_stack, global_memory, op.file, op.line)
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, global_memory, op.file, op.line)
+
+            type_stack.pop()
 
             if value_stack.pop() < 1:
                 skip_elseif_else = False
@@ -250,8 +285,10 @@ def interpret_program(program: Program):
 
             tj = op.oprands[-1]
 
-            value_stack = evaluate_stack(
-                value_stack, global_memory, op.file, op.line)
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, global_memory, op.file, op.line)
+
+            type_stack.pop()
 
             if value_stack.pop() < 1:
                 skip_elseif_else = False
@@ -271,8 +308,10 @@ def interpret_program(program: Program):
         elif op.type == OpType.OpWhile:
             tj = op.oprands[-1]
 
-            value_stack = evaluate_stack(
-                value_stack, global_memory, op.file, op.line)
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, global_memory, op.file, op.line)
+
+            type_stack.pop()
 
             if value_stack.pop() < 1:
                 ip += tj + 1
@@ -282,8 +321,10 @@ def interpret_program(program: Program):
         elif op.type == OpType.OpPrint:
             tp = op.types[-1]
 
-            value_stack = evaluate_stack(
-                value_stack, global_memory, op.file, op.line)
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, global_memory, op.file, op.line)
+
+            type_stack.pop()
 
             if tp in [Primitives.I32, Primitives.I64, Primitives.F32, Primitives.F64]:
                 print(value_stack.pop(), end="")

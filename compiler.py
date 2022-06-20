@@ -1,5 +1,3 @@
-from pprint import pprint
-from re import L
 from typing import List
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str
