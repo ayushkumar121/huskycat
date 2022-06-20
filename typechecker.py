@@ -1,7 +1,7 @@
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, unary_operators
 from parser import OpType, Program
-from static_types import Primitives, Types, type_str
+from static_types import Primitives, TypedPtr, Types, type_str
 
 def apply_op_binary(a: Types, b: Types, op: str) -> Types:
     if op in ["+",  "-", "*", "/"]:
@@ -14,11 +14,11 @@ def apply_op_binary(a: Types, b: Types, op: str) -> Types:
     return Primitives.Unknown
 
 
-def apply_op_uinary(a: int, op: str) -> Types:
+def apply_op_uinary(a: Types, op: str) -> Types:
     if op == "!":
         return Primitives.Bool
     elif op == "^":
-        return Primitives.Byte
+        return a.primitive
 
     return Primitives.Unknown
 
@@ -108,7 +108,10 @@ def typecheck_program(program: Program):
             tp = op.types[-1]
 
             if deref:
-                tp = Primitives.Byte
+                if type(tp) == TypedPtr:
+                    tp = tp.primitive
+                else:
+                    tp = Primitives.Byte
 
             if len(type_stack) == 0:
                 print(f"{op.file}:{op.line}:")

@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 import re
-from typing import List
+from typing import List, Type
 
 from misc import not_implemented, operator_list
-from static_types import Primitives, TypedPtr, Types
+from static_types import Primitives, TypedPtr, Types, size_of_primitive
 
 class OpType(Enum):
 
@@ -42,6 +42,12 @@ class Operation:
     line: int
     oprands: List[int | str]  # they can be both integers and string atm
     types: List[Types]
+
+
+@dataclass
+class Memory:
+    count: int
+    primitive: Primitives
 
 
 @dataclass
@@ -136,8 +142,8 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
     elif is_bool_literal:
         return what_bool, Primitives.Bool
     
-    # Match structs
-    elif re.fullmatch(".*\{.*\}", word):
+    # Match objects
+    elif re.fullmatch(".*\{\}", word):
         tokens: List[tuple] = re.findall("(.*)\{(.*)\}", word)
         tp = tokens.pop()
 
@@ -159,7 +165,10 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
                 f"Parsing Error : unknown type `{tp[0]}`")
             exit(1)
 
-        return 0, TypedPtr(primitive)
+        loc = program.global_memory
+        program.global_memory += size_of_primitive(primitive)
+
+        return loc, TypedPtr(primitive)
 
     # Match characters
     elif re.fullmatch("'\\\?.'", word):
@@ -296,7 +305,7 @@ def parse_program_from_file(file_path) -> Program:
                 if re.fullmatch("resb .+", right_side.strip()):
                     exp: List[str] = re.findall("resb (.+)", line)
 
-                    val, type = const_eval(
+                    val, tp = const_eval(
                         exp.pop(), program, file_path, line_num)
 
                     program.operations.append(
@@ -353,7 +362,8 @@ def parse_program_from_file(file_path) -> Program:
 
                 var_type = program.operations[i].types[j]
 
-                if deref and var_type != Primitives.Ptr:
+                if deref and var_type != Primitives.Ptr and type(var_type) != TypedPtr:
+                    print(var_type, type(var_type) == TypedPtr)
                     print(f"{file_path}:{line_num}:")
                     print(
                         f"Parsing Error: cannot deref non ptr values")

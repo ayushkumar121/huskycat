@@ -1,4 +1,5 @@
 from pprint import pprint
+from re import L
 from typing import List
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str
@@ -6,22 +7,25 @@ from static_types import Primitives, TypedPtr, Types, type_str
 
 def compile_expression(value_stack: List, type_stack: List) -> str:
     c_code = ""
-    brackets_start = False
+    deref = False
 
     while len(value_stack) > 0:
 
         val = value_stack.pop()
-        _ = type_stack.pop()
+        tp = type_stack.pop()
 
         if val == "^":
-            c_code += f"*(global_memory+"
-            brackets_start = True
+            deref = True
         else:
-            c_code += f"{val}"
-
-            if brackets_start:
-                c_code += f")"
-                brackets_start = False
+            if deref:
+                if type(tp) == TypedPtr:
+                    c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
+                else:
+                    c_code += f"*(global_memory + {val})"
+                
+                deref = False
+            else:
+                c_code += f"{val}"
 
     return c_code
 
@@ -84,13 +88,19 @@ def compile_operations(program: Program) -> str:
             deref = op.oprands[-2]
             tp = op.types[-1]
 
+            c_code += "{\n"
             if deref:
-                c_code += f"global_memory[{var}]="
+                if type(tp) == TypedPtr:
+                    c_code += f"{type_str(tp.primitive)} *tmp_cast=({type_str(tp.primitive)}*)(global_memory+{var});\n"
+                    c_code += f"*tmp_cast="
+                else:
+                    c_code += f"global_memory[{var}]="
             else:
                 c_code += f"{var}="
 
             c_code += compile_expression(value_stack, type_stack)
             c_code += f";\n"
+            c_code += "}\n"
 
         elif op.type == OpType.OpIf:
             c_code += "if("
@@ -127,7 +137,7 @@ def compile_operations(program: Program) -> str:
             elif tp == Primitives.Byte:
                 c_code += f"print_byte("
             elif tp == Primitives.Ptr:
-                c_code += f"print_ptr(\"\", "            
+                c_code += f"print_ptr(\"\", "
             elif type(tp) == TypedPtr:
                 c_code += f"print_ptr(\"{type_str(tp.primitive)}\", "
             else:
