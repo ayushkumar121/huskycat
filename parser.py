@@ -157,7 +157,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
             exit(1)
 
 
-        primitive =  parse_primitives(tp[0])
+        primitive =  parse_primitives(tp[0].strip())
         if primitive == Primitives.Unknown:
             print(
                 f"{file}:{line}:")
@@ -167,6 +167,33 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
 
         loc = program.global_memory
         program.global_memory += size_of_primitive(primitive)
+
+        return loc, TypedPtr(primitive)
+
+    # Match arrays
+    elif re.fullmatch("\[[0-9]+\].*", word):
+        tokens: List[tuple] = re.findall("\[(.*)\](.*)", word)
+        tp = tokens.pop()
+
+        if len(tp) != 2:
+            print(
+                f"{file}:{line}:")
+            print(
+                f"Parsing Error : no type found for struct")
+            exit(1)
+
+        size, _ = parse_int_literal(tp[0])
+
+        primitive =  parse_primitives(tp[1].strip())
+        if primitive == Primitives.Unknown:
+            print(
+                f"{file}:{line}:")
+            print(
+                f"Parsing Error : unknown type `{tp[0]}`")
+            exit(1)
+
+        loc = program.global_memory
+        program.global_memory += size_of_primitive(primitive) * size
 
         return loc, TypedPtr(primitive)
 
@@ -567,5 +594,4 @@ def parse_program_from_file(file_path) -> Program:
         program.operations.append(
             Operation(OpType.OpEndScope, file_path, len(lines), [], []))
 
-    # not_implemented("else if parsing")
     return program
