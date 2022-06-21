@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum, auto
+from pprint import pprint
 import re
 from typing import List, Type
 
 from misc import not_implemented, operator_list
 from static_types import Primitives, TypedPtr, Types, size_of_primitive
+
 
 class OpType(Enum):
 
@@ -24,7 +26,7 @@ class OpType(Enum):
     OpIf = auto()
 
     OpElseIf = auto()
-    
+
     # Jumps to end of the block body
     OpElse = auto()
 
@@ -52,9 +54,9 @@ class Memory:
 
 @dataclass
 class Program:
-    global_memory: int
+    global_memory_ptr: int
+    global_memory_capacity: int
     operations: List[Operation]
-
 
 def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
     l = len(program.operations)
@@ -66,7 +68,7 @@ def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
                 if symbol in op.oprands:
                     return l-(i+1), op.oprands.index(symbol)
             skip = False
-        elif op.type == OpType.OpBeginScope:
+        elif op.type == OpType.OpEndScope:
             skip = True
 
     return -1, -1
@@ -85,6 +87,20 @@ def find_local_scope(program: Program) -> int:
             skip = True
 
     return -1
+
+
+
+def alloc_mem(size:int, program: Program) -> int:
+    loc = program.global_memory_ptr
+    program.global_memory_ptr += size
+
+    i = find_local_scope(program)
+    program.operations[i].oprands[0] += size
+    
+    if program.global_memory_ptr > program.global_memory_capacity:
+        program.global_memory_capacity += size
+
+    return loc
 
 
 def parse_primitives(primitive: str) -> Primitives:
@@ -141,7 +157,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
     # Match bool literals
     elif is_bool_literal:
         return what_bool, Primitives.Bool
-    
+
     # Match objects
     elif re.fullmatch(".*\{\}", word):
         tokens: List[tuple] = re.findall("(.*)\{(.*)\}", word)
@@ -156,8 +172,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
                 f"Parsing Error : no type found for struct")
             exit(1)
 
-
-        primitive =  parse_primitives(tp[0].strip())
+        primitive = parse_primitives(tp[0].strip())
         if primitive == Primitives.Unknown:
             print(
                 f"{file}:{line}:")
@@ -165,10 +180,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
                 f"Parsing Error : unknown type `{tp[0]}`")
             exit(1)
 
-        loc = program.global_memory
-        program.global_memory += size_of_primitive(primitive)
-
-        return loc, TypedPtr(primitive)
+        return alloc_mem(size_of_primitive(primitive), program), TypedPtr(primitive)
 
     # Match arrays
     elif re.fullmatch("\[[0-9]+\].*", word):
@@ -184,7 +196,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
 
         size, _ = parse_int_literal(tp[0])
 
-        primitive =  parse_primitives(tp[1].strip())
+        primitive = parse_primitives(tp[1].strip())
         if primitive == Primitives.Unknown:
             print(
                 f"{file}:{line}:")
@@ -192,10 +204,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
                 f"Parsing Error : unknown type `{tp[0]}`")
             exit(1)
 
-        loc = program.global_memory
-        program.global_memory += size_of_primitive(primitive) * size
-
-        return loc, TypedPtr(primitive)
+        return alloc_mem(size_of_primitive(primitive) * size, program), TypedPtr(primitive)
 
     # Match characters
     elif re.fullmatch("'\\\?.'", word):
@@ -289,14 +298,15 @@ def const_eval(exp: str, program: Program, file: str, line: int) -> tuple[int | 
 
 
 def parse_program_from_file(file_path) -> Program:
-    program = Program(global_memory=1, operations=[])
+    program = Program(global_memory_ptr=1,
+                      global_memory_capacity=1, operations=[])
 
     with open(file_path) as file:
         lines = re.split("[\n]", file.read())
 
         # Initialize the global scope
         program.operations.append(
-            Operation(OpType.OpBeginScope, file_path, 1, [], []))
+            Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Unknown]))
 
         for line_num, line in enumerate(lines):
 
@@ -319,7 +329,7 @@ def parse_program_from_file(file_path) -> Program:
                 var_type = Primitives.Unknown
 
                 if i == -1:
-                    if var_tp[0] == "^":                     
+                    if var_tp[0] == "^":
                         primitive = parse_primitives(var_tp[1:])
 
                         if primitive == Primitives.Unknown:
@@ -332,7 +342,6 @@ def parse_program_from_file(file_path) -> Program:
                         var_type = parse_primitives(var_tp)
                         pass
 
-
                     if var_type == Primitives.Unknown:
                         print(f"{file_path}:{line_num}:")
                         print(f"Parsing Error: unknown type `{var_tp}`")
@@ -344,7 +353,8 @@ def parse_program_from_file(file_path) -> Program:
                     program.operations[i].types.append(var_type)
                 else:
                     print(f"{file_path}:{line_num}:")
-                    print(f"Parsing Error: variable `{var_tp}` already declared")
+                    print(
+                        f"Parsing Error: variable `{var_tp}` already declared")
                     exit(1)
 
             #  Matching Assignments
@@ -376,9 +386,7 @@ def parse_program_from_file(file_path) -> Program:
                         exp.pop(), program, file_path, line_num)
 
                     program.operations.append(
-                        Operation(OpType.OpPush, file_path, line_num, [program.global_memory], [Primitives.Ptr]))
-
-                    program.global_memory += val
+                        Operation(OpType.OpPush, file_path, line_num, [alloc_mem(val, program)], [Primitives.Ptr]))
                 else:
                     eval_stack, types = parse_expression(
                         right_side, program, file_path, line_num)
@@ -398,18 +406,18 @@ def parse_program_from_file(file_path) -> Program:
                             f"Parsing Error: expected type when declaring a variable")
                         exit(1)
 
-                    if var_info[1][0] == "^":                     
+                    if var_info[1][0] == "^":
                         primitive = parse_primitives(var_info[1][1:])
 
                         if primitive == Primitives.Unknown:
                             print(f"{file_path}:{line_num}:")
-                            print(f"Parsing Error: unknown type `{var_info[1]}`")
+                            print(
+                                f"Parsing Error: unknown type `{var_info[1]}`")
                             exit(1)
 
                         var_type = TypedPtr(primitive)
                     else:
                         var_type = parse_primitives(var_info[1])
-
 
                     if var_type == Primitives.Unknown:
                         print(f"{file_path}:{line_num}:")
@@ -438,7 +446,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpMov, file_path, line_num, [deref, var_name], [var_type]))
- 
+
             # Matching if keyword
             elif re.fullmatch("if .*{", line):
                 tokens = re.findall("if (.*){", line)
@@ -453,7 +461,7 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpIf, file_path, line_num, [], []))
 
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
 
             # Matching elif keyword
             elif re.fullmatch("else if .*{", line):
@@ -462,8 +470,7 @@ def parse_program_from_file(file_path) -> Program:
                 if top_op.type != OpType.OpEndScope:
                     print(f"{file_path}:{line_num}:")
                     print(f"Parsing Error: unexpected expression else if")
-                    exit(1)                                            
-                 
+                    exit(1)
 
                 skip = False
                 if_found = False
@@ -474,14 +481,13 @@ def parse_program_from_file(file_path) -> Program:
                         if not skip:
                             if_found = True
                             break
-                        
+
                         skip = False
 
                 if not if_found:
                     print(f"{file_path}:{line_num}:")
                     print(f"Parsing Error: unexpected else if without if")
-                    exit(1)                                            
-
+                    exit(1)
 
                 tokens = re.findall("else if (.*){", line)
 
@@ -495,17 +501,17 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpElseIf, file_path, line_num, [], []))
 
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
 
             # Matching else keyword
             elif re.fullmatch("else.*{", line):
-                
+
                 top_op = program.operations[-1]
 
                 if top_op.type != OpType.OpEndScope:
                     print(f"{file_path}:{line_num}:")
                     print(f"Parsing Error: unexpected expression else")
-                    exit(1)            
+                    exit(1)
 
                 skip = False
                 if_found = False
@@ -516,19 +522,19 @@ def parse_program_from_file(file_path) -> Program:
                         if not skip:
                             if_found = True
                             break
-                        
+
                         skip = False
 
                 if not if_found:
                     print(f"{file_path}:{line_num}:")
                     print(f"Parsing Error: unexpected else without if")
-                    exit(1)                                            
+                    exit(1)
 
                 program.operations.append(
                     Operation(OpType.OpElse, file_path, line_num, [], []))
 
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
 
             # Matching while keyword
             elif re.fullmatch("while .*{", line):
@@ -544,7 +550,7 @@ def parse_program_from_file(file_path) -> Program:
                     Operation(OpType.OpWhile, file_path, line_num, [], []))
 
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [], []))
+                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
 
             # Matching end of blocks
             elif re.fullmatch("}", line):
@@ -568,6 +574,9 @@ def parse_program_from_file(file_path) -> Program:
                 elif op_type == OpType.OpIf:
                     stack = []
 
+                i = find_local_scope(program)
+                program.global_memory_ptr -= program.operations[i].oprands[0]
+
                 program.operations.append(
                     Operation(OpType.OpEndScope, file_path, line_num, stack, []))
 
@@ -583,7 +592,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 program.operations.append(
                     Operation(OpType.OpPrint, file_path, line_num, [], []))
-          
+
             # Other
             else:
                 print(f"{file_path}:{line_num}:")

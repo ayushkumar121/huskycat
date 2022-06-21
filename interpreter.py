@@ -139,7 +139,7 @@ def interpret_program(program: Program):
     value_stack: List[int | str] = []
     scopes: List[List[Var]] = []
 
-    global_memory = bytearray(program.global_memory)
+    global_memory = bytearray(program.global_memory_capacity)
 
     assert len(OpType) == 9, "Exhaustive handling of operations"
 
@@ -152,7 +152,7 @@ def interpret_program(program: Program):
         if op.type == OpType.OpBeginScope:
 
             vars = []
-            for opi, opr in enumerate(op.oprands[::-1]):
+            for opi, opr in enumerate(op.oprands[1:][::-1]):
                 var = opr
                 tp = op.types[len(op.oprands) - (opi+1)]
 
@@ -230,7 +230,7 @@ def interpret_program(program: Program):
                     scopes[i][j].value, "big")
 
                 if type(tp) == TypedPtr:
-                    if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory - 1:
+                    if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory_ptr - 1:
                         print(f"{op.file}:{op.line}:")
                         print(
                         f"Interpreter Error : trying to access unallocated memory")
@@ -241,7 +241,7 @@ def interpret_program(program: Program):
                     for i, bt in enumerate(bts):
                         global_memory[deref_index + i] = bt
                 else:
-                    if deref_index > program.global_memory - 1:
+                    if deref_index > program.global_memory_ptr - 1:
                         print(f"{op.file}:{op.line}:")
                         print(
                         f"Interpreter Error : trying to access unallocated memory")

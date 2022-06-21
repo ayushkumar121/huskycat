@@ -41,7 +41,7 @@ def compile_operations(program: Program) -> str:
         if op.type == OpType.OpBeginScope:
             c_code += "{\n"
 
-            while len(op.oprands) > 0:
+            while len(op.oprands[1:]) > 0:
                 var = op.oprands.pop()
                 tp = op.types.pop()
 
@@ -179,7 +179,7 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
 
 int main() {
 """
-    c_code += f"byte global_memory[{program.global_memory}];\n"
+    c_code += f"byte global_memory[{program.global_memory_capacity}];\n"
     c_code += compile_operations(program)
     c_code += """return 0;
 }

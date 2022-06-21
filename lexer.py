@@ -29,6 +29,7 @@ def lex_source(file_path) -> List[Token]:
             #  Matching Declaration
             elif re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*:\^?[a-zA-Z][a-zA-Z0-9]*", line):
                 pass
+
             #  Matching Assignments
             elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?\^?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
                 pass
