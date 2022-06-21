@@ -57,10 +57,6 @@ def compile_operations(program: Program) -> str:
                     c_code += f"bool {var};\n"
                 elif tp == Primitives.Byte:
                     c_code += f"byte {var};\n"
-                elif tp == Primitives.Ptr:
-                    c_code += f"ptr {var};\n"
-                elif tp == Primitives.Ptr:
-                    c_code += f"ptr {var};\n"
                 elif type(tp) == TypedPtr:
                     c_code += f"ptr {var};\n"
                 else:
@@ -134,8 +130,6 @@ def compile_operations(program: Program) -> str:
                 c_code += f"print_bool("
             elif tp == Primitives.Byte:
                 c_code += f"print_byte("
-            elif tp == Primitives.Ptr:
-                c_code += f"print_ptr(\"\", "
             elif type(tp) == TypedPtr:
                 c_code += f"print_ptr(\"{type_str(tp.primitive)}\", "
             else:

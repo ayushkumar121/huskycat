@@ -61,7 +61,7 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], tp_stack: L
         b_tp = tp_stack.pop()
 
         value_stack.append(apply_op_binary(
-            a, b, op, [a_tp, b_tp], tp_stack, global_memory))
+            a, b, op, [a_tp, b_tp], global_memory))
         tp_stack.append(apply_op_binary_on_types(a_tp, b_tp, op))
 
     # Uninary operators
@@ -160,8 +160,8 @@ def interpret_program(program: Program):
                     vars.append(Var(var, tp, size_of_primitive(
                         tp), bytearray(size_of_primitive(tp))))
                 elif type(tp) == TypedPtr:
-                    vars.append(Var(var, tp, size_of_primitive(Primitives.Ptr),
-                                    bytearray(size_of_primitive(Primitives.Ptr))))
+                    vars.append(Var(var, tp, size_of_primitive(Primitives.I64),
+                                    bytearray(size_of_primitive(Primitives.I64))))
                 else:
                     print(f"{op.file}:{op.line}:")
                     print(
@@ -190,7 +190,7 @@ def interpret_program(program: Program):
                     val = 0
 
                     if tp in [Primitives.I32, Primitives.I64, Primitives.Byte,
-                              Primitives.Bool, Primitives.Ptr]:
+                              Primitives.Bool]:
                         val = int.from_bytes(
                             scopes[i][j].value, "big")
                     elif tp in [Primitives.F32, Primitives.F64]:
@@ -249,7 +249,7 @@ def interpret_program(program: Program):
 
                     global_memory[deref_index] = int(value_stack.pop())
 
-            elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool, Primitives.Ptr]:
+            elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of_primitive(tp), "big")
 
@@ -259,7 +259,7 @@ def interpret_program(program: Program):
 
             elif type(tp) == TypedPtr:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
-                    size_of_primitive(Primitives.Ptr), "big")
+                    size_of_primitive(Primitives.I64), "big")
             else:
                 print(f"{op.file}:{op.line}:")
                 print(
@@ -338,8 +338,6 @@ def interpret_program(program: Program):
                 print(chr(value_stack.pop()), end="")
             elif tp == Primitives.Bool:
                 print("true" if value_stack.pop() == 1 else "false", end="")
-            elif tp == Primitives.Ptr:
-                print(f"^({value_stack.pop()})", end="")
             elif type(tp) == TypedPtr:
                 print(f"^{type_str(tp.primitive)}({value_stack.pop()})", end="")
             else:

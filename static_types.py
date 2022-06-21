@@ -8,7 +8,6 @@ class Primitives(Enum):
     F32 = auto()
     F64 = auto()
     Bool = auto()
-    Ptr = auto()
     Operator = auto()
     Unknown = auto()
 
@@ -21,7 +20,7 @@ Types = Primitives | TypedPtr
 def size_of_primitive(primitive: Primitives) -> int:
     if primitive in [Primitives.I32, Primitives.F32]:
         return 4
-    elif primitive in [Primitives.I64, Primitives.F64, Primitives.Ptr]:
+    elif primitive in [Primitives.I64, Primitives.F64]:
         return 8
     elif primitive in [Primitives.Bool, Primitives.Byte]:
         return 1
@@ -41,8 +40,6 @@ def type_str(tp: Types) -> str:
         return "bool"
     elif tp == Primitives.Byte:
         return "byte"
-    elif tp == Primitives.Ptr:
-        return "ptr"
     elif type(tp) == TypedPtr:
         return f"^{type_str(tp.primitive)}"
 

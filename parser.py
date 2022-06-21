@@ -116,8 +116,6 @@ def parse_primitives(primitive: str) -> Primitives:
         return Primitives.Bool
     elif primitive == "byte":
         return Primitives.Byte
-    elif primitive == "ptr":
-        return Primitives.Ptr
 
     return Primitives.Unknown
 
@@ -428,7 +426,7 @@ def parse_program_from_file(file_path) -> Program:
 
                 var_type = program.operations[i].types[j]
 
-                if deref and var_type != Primitives.Ptr and type(var_type) != TypedPtr:
+                if deref and type(var_type) != TypedPtr:
                     print(var_type, type(var_type) == TypedPtr)
                     print(f"{file_path}:{line_num}:")
                     print(
