@@ -1,8 +1,8 @@
 
 width:i64=40
 height:i64=30
-state:ptr=resb 2400
-s:ptr=state
+state:^byte= [2400]byte
+s:^byte=state
 
 i:i64 = 0
 j:i64 = 0
@@ -30,9 +30,9 @@ while i<height {
     
     j = 0
     while (j<width-2) && (i<height-1){
-        s1:ptr=state+j+ i*width
-        s2:ptr=state+j+1 + i*width
-        s3:ptr=state+j+2 + i*width
+        s1:^byte=state+j+ i*width
+        s2:^byte=state+j+1 + i*width
+        s3:^byte=state+j+2 + i*width
 
 
         // 111 => 0

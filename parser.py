@@ -58,6 +58,7 @@ class Program:
     global_memory_capacity: int
     operations: List[Operation]
 
+
 def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
     l = len(program.operations)
 
@@ -89,14 +90,13 @@ def find_local_scope(program: Program) -> int:
     return -1
 
 
-
-def alloc_mem(size:int, program: Program) -> int:
+def alloc_mem(size: int, program: Program) -> int:
     loc = program.global_memory_ptr
     program.global_memory_ptr += size
 
     i = find_local_scope(program)
     program.operations[i].oprands[0] += size
-    
+
     if program.global_memory_ptr > program.global_memory_capacity:
         program.global_memory_capacity += size
 
@@ -379,20 +379,11 @@ def parse_program_from_file(file_path) -> Program:
                 var_name = var_info[0]
 
                 # parsing right side of an assignment
-                if re.fullmatch("resb .+", right_side.strip()):
-                    exp: List[str] = re.findall("resb (.+)", line)
+                eval_stack, types = parse_expression(
+                    right_side, program, file_path, line_num)
 
-                    val, tp = const_eval(
-                        exp.pop(), program, file_path, line_num)
-
-                    program.operations.append(
-                        Operation(OpType.OpPush, file_path, line_num, [alloc_mem(val, program)], [Primitives.Ptr]))
-                else:
-                    eval_stack, types = parse_expression(
-                        right_side, program, file_path, line_num)
-
-                    program.operations.append(
-                        Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                program.operations.append(
+                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
 
                 i, j = find_scope_with_symbol(var_name, program)
 
