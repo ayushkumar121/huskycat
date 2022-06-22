@@ -1,2 +1,1 @@
-print 1<2
-print '\n'
+a:i64=

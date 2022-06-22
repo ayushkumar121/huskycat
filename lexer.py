@@ -38,14 +38,14 @@ def lex_source(file_path) -> List[Token]:
                         Token(":", file_path, line_num))
                     tokens.append(
                         Token(lside_tks[1].strip(), file_path, line_num))
-                
+
             #  Matching Assignments
             elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?\^?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
                 tks = re.split("=", line)
 
                 if len(tks) != 2:
-                    report_error(f"asssignment must be of form var=expression", file_path, line_num)
-
+                    report_error(
+                        f"asssignment must be of form var=expression", file_path, line_num)
 
                 lside = tks[0].strip()
                 rside = tks[1].strip()
@@ -56,8 +56,9 @@ def lex_source(file_path) -> List[Token]:
                 if len(lside_tks) == 2:
                     tokens.append(
                         Token(":", file_path, line_num))
-                    tokens.append(
-                        Token(lside_tks[1].strip(), file_path, line_num))
+                    if lside_tks[1].strip() != "":
+                        tokens.append(
+                            Token(lside_tks[1].strip(), file_path, line_num))
 
                 tokens.append(Token("=", file_path, line_num))
                 tokens.append(Token(rside, file_path, line_num))
