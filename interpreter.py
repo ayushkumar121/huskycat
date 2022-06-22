@@ -87,7 +87,7 @@ def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types], global_
 
         elif str(token) == ")":
             while len(ops_stack) > 0 and ops_stack[-1] != "(":
-                evaluate_operation(value_stack, ops_stack,
+                evaluate_operation(value_stack, ops_stack, tp_stack,
                                    global_memory, file, line)
 
             if len(ops_stack) > 0:
@@ -176,9 +176,9 @@ def interpret_program(program: Program):
             value_stack = []
             type_stack = []
 
-            for opr in op.oprands[::-1]:
+            for opi, opr in enumerate(op.oprands[::-1]):
                 i, j = find_var_scope(opr, scopes)
-                tp = scopes[i][j].type
+                tp = op.types[len(op.oprands) - (opi+1)]
 
                 if i != -1:
                     val = 0

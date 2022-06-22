@@ -454,9 +454,12 @@ def parse_program_from_file(file_path: str) -> Program:
                     tp = program.operations[ip].types[opi]
 
                 next_token = peek_token(tokens, state)
-                if next_token.word == "=":
+                if next_token is not None and next_token.word == "=":
                     consume_token(tokens, state)
                     token = consume_token(tokens, state)
+
+                    if token.word == "":
+                        report_error("expected expression after `=`", token.file, token.line)
 
                     eval_stack, types = parse_expression(
                         token.word, program, token.file, token.line)
