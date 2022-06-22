@@ -1,7 +1,8 @@
 from typing import List
-from misc import operator_predence, operator_list, binary_operators, unary_operators
+from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str
+
 
 def apply_op_binary_on_types(a: Types, b: Types, op: str) -> Types:
     if op in ["+",  "-", "*", "/"]:
@@ -72,10 +73,8 @@ def evaluate_stack(eval_stack: List[int | str],
         evaluate_operation(type_stack, ops_stack, file, line)
 
     if len(type_stack) != 1:
-        print(f"{file}:{line}:")
-        print(
-            f"Typecheck Error : unable to type evaluate following stack {eval_stack}")
-        exit(1)
+        report_error(
+            f"unable to type evaluate following stack {eval_stack}", file, line)
     return [0], type_stack
 
 
@@ -83,7 +82,7 @@ def typecheck_program(program: Program):
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
-    assert  len(OpType) == 9, "Exhaustive handling of operations"
+    assert len(OpType) == 9, "Exhaustive handling of operations"
 
     for op in program.operations:
 
@@ -114,9 +113,8 @@ def typecheck_program(program: Program):
                     tp = Primitives.Byte
 
             if len(type_stack) == 0:
-                print(f"{op.file}:{op.line}:")
-                print(f"Typecheck error: attempting to typecheck an empty typestack")
-                exit(1)
+                report_error(
+                    f"attempting to typecheck an empty typestack", op.file, op.line)
 
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)
@@ -125,16 +123,13 @@ def typecheck_program(program: Program):
             found = type_stack.pop()
 
             if tp != found:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Typecheck error: mismatch type on assignment, expected `{type_str(tp)}` found `{type_str(found)}`")
-                exit(1)
+                report_error(
+                    f"mismatch type on assignment, expected `{type_str(tp)}` found `{type_str(found)}`", op.file, op.line)
 
         elif op.type == OpType.OpIf:
             if len(type_stack) == 0:
-                print(f"{op.file}:{op.line}:")
-                print(f"Typecheck error: attempting to typecheck an empty typestack")
-                exit(1)
+                report_error(
+                    f"attempting to typecheck an empty typestack`", op.file, op.line)
 
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)
@@ -142,16 +137,13 @@ def typecheck_program(program: Program):
             value_stack.pop()
             found = type_stack.pop()
             if found != Primitives.Bool:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Typecheck error: unexpected type on if expression, expected `bool` found `{type_str(found)}")
-                exit(1)
+                report_error(
+                    f"unexpected type on if expression, expected `bool` found `{type_str(found)}`", op.file, op.line)
 
         elif op.type == OpType.OpElseIf:
             if len(type_stack) == 0:
-                print(f"{op.file}:{op.line}:")
-                print(f"Typecheck error: attempting to typecheck an empty typestack")
-                exit(1)
+                report_error(
+                    f"attempting to typecheck an empty typestack", op.file, op.line)
 
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)
@@ -159,19 +151,16 @@ def typecheck_program(program: Program):
             value_stack.pop()
             found = type_stack.pop()
             if found != Primitives.Bool:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Typecheck error: unexpected type on else if expression, expected `bool` found `{type_str(found)}`")
-                exit(1)
+                report_error(
+                    f"unexpected type on else if expression, expected `bool` found `{type_str(found)}`", op.file, op.line)
 
         elif op.type == OpType.OpElse:
             pass
 
         elif op.type == OpType.OpWhile:
             if len(type_stack) == 0:
-                print(f"{op.file}:{op.line}:")
-                print(f"Typecheck error: attempting to typecheck an empty typestack")
-                exit(1)
+                report_error(
+                    f"attempting to typecheck an empty typestack", op.file, op.line)
 
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)
@@ -179,10 +168,8 @@ def typecheck_program(program: Program):
             value_stack.pop()
             found = type_stack.pop()
             if found != Primitives.Bool:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Typecheck error: unexpected type on while expression, expected `bool` found `{type_str(found)}")
-                exit(1)
+                report_error(
+                    f"unexpected type on while expression, expected `bool` found `{type_str(found)}", op.file, op.line)
 
         elif op.type == OpType.OpPrint:
             value_stack, type_stack = evaluate_stack(
@@ -191,4 +178,3 @@ def typecheck_program(program: Program):
             value_stack.pop()
 
             op.types.append(type_stack.pop())
-        

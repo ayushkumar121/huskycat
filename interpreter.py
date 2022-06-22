@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from misc import operator_predence, operator_list, binary_operators, unary_operators
+from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str, size_of_primitive
 from typechecker import apply_op_binary_on_types, apply_op_uinary_on_types
@@ -105,21 +105,16 @@ def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types], global_
             tp_stack.append(type_stack[l - (i+1)])
 
         else:
-            print(f"{file}:{line}:")
-            print(
-                f"Interpreter Error : unrecognised token `{token}` in eval stack")
-            exit(1)
+            report_error(
+                f"unrecognised token `{token}` in eval stack", file, line)
 
     while len(ops_stack) > 0:
         evaluate_operation(value_stack, ops_stack, tp_stack,
                            global_memory, file, line)
 
     if len(value_stack) != 1 or len(tp_stack) != 1:
-        print(value_stack, tp_stack)
-        print(f"{file}:{line}:")
-        print(
-            f"Interpreter Error : unable to evalution following stack {eval_stack}")
-        exit(1)
+        report_error(
+            f"unable to evalution following stack {eval_stack}", file, line)
 
     return value_stack, tp_stack
 
@@ -163,10 +158,9 @@ def interpret_program(program: Program):
                     vars.append(Var(var, tp, size_of_primitive(Primitives.I64),
                                     bytearray(size_of_primitive(Primitives.I64))))
                 else:
-                    print(f"{op.file}:{op.line}:")
-                    print(
-                        f"Interpreter Error : definition of type {type_str(tp)} not defined")
-                    exit(1)
+                    report_error(
+                        f"definition of type {type_str(tp)} not defined", op.file, op.line)
+
             scopes.append(vars)
             ip += 1
 
@@ -201,10 +195,8 @@ def interpret_program(program: Program):
                         val = int.from_bytes(
                             scopes[i][j].value, "big")
                     else:
-                        print(f"{op.file}:{op.line}:")
-                        print(
-                            f"Interpreter Error : evaluation of type `{tp} not supported`")
-                        exit(1)
+                        report_error(
+                            f"evaluation of type `{tp} not supported", op.file, op.line)
 
                     value_stack.append(val)
                 else:
@@ -231,10 +223,8 @@ def interpret_program(program: Program):
 
                 if type(tp) == TypedPtr:
                     if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory_ptr - 1:
-                        print(f"{op.file}:{op.line}:")
-                        print(
-                        f"Interpreter Error : trying to access unallocated memory")
-                        exit(1)
+                        report_error(
+                            f"trying to access unallocated memory", op.file, op.line)
 
                     bts = int(value_stack.pop()).to_bytes(
                         size_of_primitive(tp.primitive), "big")
@@ -242,10 +232,8 @@ def interpret_program(program: Program):
                         global_memory[deref_index + i] = bt
                 else:
                     if deref_index > program.global_memory_ptr - 1:
-                        print(f"{op.file}:{op.line}:")
-                        print(
-                        f"Interpreter Error : trying to access unallocated memory")
-                        exit(1)
+                        report_error(
+                            f"trying to access unallocated memory", op.file, op.line)
 
                     global_memory[deref_index] = int(value_stack.pop())
 
@@ -261,10 +249,8 @@ def interpret_program(program: Program):
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of_primitive(Primitives.I64), "big")
             else:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Interpreter Error : assignment for this type {type_str(tp)} not defined")
-                exit(1)
+                report_error(
+                    f"assignment for this type {type_str(tp)} not defined", op.file, op.line)
 
             ip += 1
 
@@ -341,9 +327,7 @@ def interpret_program(program: Program):
             elif type(tp) == TypedPtr:
                 print(f"^{type_str(tp.primitive)}({value_stack.pop()})", end="")
             else:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Interpreter Error : undefined print for this type")
-                exit(1)
+                report_error(
+                    f"undefined print for this type", op.file, op.line)
 
             ip += 1

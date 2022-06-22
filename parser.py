@@ -2,9 +2,10 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from pprint import pprint
 import re
-from typing import List, Type
+from typing import List
+from lexer import Token, lex_source
 
-from misc import not_implemented, operator_list
+from misc import not_implemented, operator_list, report_error
 from static_types import Primitives, TypedPtr, Types, size_of_primitive
 
 
@@ -164,19 +165,13 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         # TODO: parse what's inside struct
 
         if len(tp) != 2:
-            print(
-                f"{file}:{line}:")
-            print(
-                f"Parsing Error : no type found for struct")
-            exit(1)
+            report_error(
+                f"no type found for struct", file, line)
 
         primitive = parse_primitives(tp[0].strip())
         if primitive == Primitives.Unknown:
-            print(
-                f"{file}:{line}:")
-            print(
-                f"Parsing Error : unknown type `{tp[0]}`")
-            exit(1)
+            report_error(
+                f"unknown type `{tp[0]}`", file, line)
 
         return alloc_mem(size_of_primitive(primitive), program), TypedPtr(primitive)
 
@@ -186,21 +181,15 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         tp = tokens.pop()
 
         if len(tp) != 2:
-            print(
-                f"{file}:{line}:")
-            print(
-                f"Parsing Error : no type found for struct")
-            exit(1)
+            report_error(
+                f"no type found for arrays", file, line)
 
         size, _ = parse_int_literal(tp[0])
 
         primitive = parse_primitives(tp[1].strip())
         if primitive == Primitives.Unknown:
-            print(
-                f"{file}:{line}:")
-            print(
-                f"Parsing Error : unknown type `{tp[0]}`")
-            exit(1)
+            report_error(
+                f"unknown type `{tp[0]}`", file, line)
 
         return alloc_mem(size_of_primitive(primitive) * size, program), TypedPtr(primitive)
 
@@ -221,11 +210,8 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
 
             return ord(char), Primitives.Byte
         else:
-            print(
-                f"{file}:{line}:")
-            print(
-                f"Parsing Error : no character inside character brackets")
-            exit(1)
+            report_error(
+                f"no character inside character brackets", file, line)
 
     # Match variables
     elif op_index != -1:
@@ -233,11 +219,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         return word, type
 
     else:
-        print(
-            f"{file}:{line}:")
-        print(
-            f"Parsing Error : unrecognised word `{word}`")
-        exit(1)
+        report_error("unrecognised word `{word}`", file, line)
 
 
 def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Types]]:
@@ -282,184 +264,57 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     return eval_stack, type_stack
 
 
-# TODO: implement const eval
-def const_eval(exp: str, program: Program, file: str, line: int) -> tuple[int | str, Types]:
-    value, val_type = parse_word(exp, program, file, line)
-
-    if type(value) != type(0):
-        print(f"{file}:{line}:")
-        print(
-            f"Parsing Error: unsupported symbol in constant evaluation")
-        exit(1)
-
-    return value, val_type
+def consume_token(tokens: List[Token], i: List[int]) -> Token | None:
+    if i[0] >= len(tokens):
+        return None
+    token = tokens[i[0]]
+    i[0] = i[0] + 1
+    return token
 
 
-def parse_program_from_file(file_path) -> Program:
+def peek_token(tokens: List[Token], i: List[int]) -> Token | None:
+    if i[0] >= len(tokens):
+        return None
+    token = tokens[i[0]]
+    return token
+
+
+keywords = ["if", "while", "else", "print", "{", "}"]
+
+
+def parse_program_from_file(file_path: str) -> Program:
+    tokens = lex_source(file_path)
+
     program = Program(global_memory_ptr=1,
                       global_memory_capacity=1, operations=[])
 
-    with open(file_path) as file:
-        lines = re.split("[\n]", file.read())
+    program.operations.append(
+        Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Unknown]))
 
-        # Initialize the global scope
-        program.operations.append(
-            Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Unknown]))
+    state = [0]
+    while state[0] < len(tokens):
+        token = consume_token(tokens, state)
 
-        for line_num, line in enumerate(lines):
-
-            line = line.split("//")[0].strip()
-            line_num = line_num + 1
-
-            # Skip empty lines
-            if line == "":
-                continue
-
-            #  Matching Declaration
-            elif re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*:\^?[a-zA-Z][a-zA-Z0-9]*", line):
-                tokens = re.split(":", line)
-
-                var_name = tokens[0]
-                var_tp = tokens[1]
-
-                i, j = find_scope_with_symbol(var_name, program)
-
-                var_type = Primitives.Unknown
-
-                if i == -1:
-                    if var_tp[0] == "^":
-                        primitive = parse_primitives(var_tp[1:])
-
-                        if primitive == Primitives.Unknown:
-                            print(f"{file_path}:{line_num}:")
-                            print(f"Parsing Error: unknown type `{var_tp}`")
-                            exit(1)
-
-                        var_type = TypedPtr(primitive)
-                    else:
-                        var_type = parse_primitives(var_tp)
-                        pass
-
-                    if var_type == Primitives.Unknown:
-                        print(f"{file_path}:{line_num}:")
-                        print(f"Parsing Error: unknown type `{var_tp}`")
-                        exit(1)
-
-                    i = find_local_scope(program)
-
-                    program.operations[i].oprands.append(var_name)
-                    program.operations[i].types.append(var_type)
-                else:
-                    print(f"{file_path}:{line_num}:")
-                    print(
-                        f"Parsing Error: variable `{var_tp}` already declared")
-                    exit(1)
-
-            #  Matching Assignments
-            elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*:?\^?[a-zA-Z]?[a-zA-Z0-9]*?[ ]*=.*", line):
-                deref = False
-                tokens = re.split("[ ]*=[ ]*", line)
-
-                if len(tokens) > 2:
-                    print(f"{file_path}:{line_num}:")
-                    print(
-                        "Parsing Error: muliple '=' found on right side of an assignment")
-                    exit(1)
-
-                left_side: str = tokens[0]
-                right_side: str = tokens[1]
-
-                if left_side[0] == "^":
-                    left_side = left_side[1:]
-                    deref = True
-
-                var_info = left_side.split(":")
-                var_name = var_info[0]
-
-                # parsing right side of an assignment
-                eval_stack, types = parse_expression(
-                    right_side, program, file_path, line_num)
-
-                program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
-
-                i, j = find_scope_with_symbol(var_name, program)
-
-                var_type = Primitives.Unknown
-
-                # declaration
-                if i == -1:
-                    if len(var_info) != 2:
-                        print(f"{file_path}:{line_num}:")
-                        print(
-                            f"Parsing Error: expected type when declaring a variable")
-                        exit(1)
-
-                    if var_info[1][0] == "^":
-                        primitive = parse_primitives(var_info[1][1:])
-
-                        if primitive == Primitives.Unknown:
-                            print(f"{file_path}:{line_num}:")
-                            print(
-                                f"Parsing Error: unknown type `{var_info[1]}`")
-                            exit(1)
-
-                        var_type = TypedPtr(primitive)
-                    else:
-                        var_type = parse_primitives(var_info[1])
-
-                    if var_type == Primitives.Unknown:
-                        print(f"{file_path}:{line_num}:")
-                        print(f"Parsing Error: unknown type `{var_info[1]}`")
-                        exit(1)
-
-                    i = find_local_scope(program)
-
-                    program.operations[i].oprands.append(var_name)
-                    program.operations[i].types.append(var_type)
-                else:
-                    if len(var_info) != 1:
-                        print(f"{file_path}:{line_num}:")
-                        print(
-                            f"Parsing Error: cannot redefine types for declared variables")
-                        exit(1)
-
-                var_type = program.operations[i].types[j]
-
-                if deref and type(var_type) != TypedPtr:
-                    print(var_type, type(var_type) == TypedPtr)
-                    print(f"{file_path}:{line_num}:")
-                    print(
-                        f"Parsing Error: cannot deref non ptr values")
-                    exit(1)
-
-                program.operations.append(
-                    Operation(OpType.OpMov, file_path, line_num, [deref, var_name], [var_type]))
-
-            # Matching if keyword
-            elif re.fullmatch("if .*{", line):
-                tokens = re.findall("if (.*){", line)
+        if token.word in keywords:
+            if token.word == "if":
+                token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    tokens.pop(), program, file_path, line_num)
+                    token.word, program, token.file, token.line)
 
                 program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
                 program.operations.append(
-                    Operation(OpType.OpIf, file_path, line_num, [], []))
+                    Operation(OpType.OpIf, token.file, token.line, [], []))
 
-                program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
+            elif token.word == "else":
 
-            # Matching elif keyword
-            elif re.fullmatch("else if .*{", line):
                 top_op = program.operations[-1]
 
                 if top_op.type != OpType.OpEndScope:
-                    print(f"{file_path}:{line_num}:")
-                    print(f"Parsing Error: unexpected expression else if")
-                    exit(1)
+                    report_error("unexpected expression else",
+                                 token.file, token.line)
 
                 skip = False
                 if_found = False
@@ -474,75 +329,44 @@ def parse_program_from_file(file_path) -> Program:
                         skip = False
 
                 if not if_found:
-                    print(f"{file_path}:{line_num}:")
-                    print(f"Parsing Error: unexpected else if without if")
-                    exit(1)
+                    report_error("unexpected else without if",
+                                 token.file, token.line)
 
-                tokens = re.findall("else if (.*){", line)
+                next_token = peek_token(tokens, state)
 
-                eval_stack, types = parse_expression(
-                    tokens.pop(), program, file_path, line_num)
+                if next_token.word == "if":  # elseif
+                    consume_token(tokens, state)
+                    token = consume_token(tokens, state)
 
-                program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                    eval_stack, types = parse_expression(
+                        token.word, program, token.file, token.line)
 
-                program.operations.append(
-                    Operation(OpType.OpElseIf, file_path, line_num, [], []))
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
-                program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
+                    program.operations.append(
+                        Operation(OpType.OpElseIf, token.file, token.line, [], []))
+                else:
+                    program.operations.append(
+                        Operation(OpType.OpElse, token.file, token.line, [], []))
 
-            # Matching else keyword
-            elif re.fullmatch("else.*{", line):
-
-                top_op = program.operations[-1]
-
-                if top_op.type != OpType.OpEndScope:
-                    print(f"{file_path}:{line_num}:")
-                    print(f"Parsing Error: unexpected expression else")
-                    exit(1)
-
-                skip = False
-                if_found = False
-                for op in program.operations[::-1]:
-                    if op.type == OpType.OpElse:
-                        skip = True
-                    elif op.type == OpType.OpIf:
-                        if not skip:
-                            if_found = True
-                            break
-
-                        skip = False
-
-                if not if_found:
-                    print(f"{file_path}:{line_num}:")
-                    print(f"Parsing Error: unexpected else without if")
-                    exit(1)
-
-                program.operations.append(
-                    Operation(OpType.OpElse, file_path, line_num, [], []))
-
-                program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
-
-            # Matching while keyword
-            elif re.fullmatch("while .*{", line):
-                tokens = re.findall("while (.*){", line)
+            elif token.word == "while":
+                token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    tokens.pop(), program, file_path, line_num)
+                    token.word, program, token.file, token.line)
 
                 program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
                 program.operations.append(
-                    Operation(OpType.OpWhile, file_path, line_num, [], []))
+                    Operation(OpType.OpWhile, token.file, token.line, [], []))
 
+            elif token.word == "{":
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, file_path, line_num, [0], [Primitives.Unknown]))
+                    Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Unknown]))
 
-            # Matching end of blocks
-            elif re.fullmatch("}", line):
+            elif token.word == "}":
                 i = 0
                 j = 0
                 op_type = OpType.OpIf
@@ -567,29 +391,89 @@ def parse_program_from_file(file_path) -> Program:
                 program.global_memory_ptr -= program.operations[i].oprands[0]
 
                 program.operations.append(
-                    Operation(OpType.OpEndScope, file_path, line_num, stack, []))
+                    Operation(OpType.OpEndScope, token.file, token.line, stack, []))
+                pass
 
-            # Matching print intrinsic
-            elif re.fullmatch("print .+", line):
-                exp: List[str] = re.findall("print (.+)", line)
+            elif token.word == "print":
+                token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    exp.pop(), program, file_path, line_num)
+                    token.word, program, token.file, token.line)
 
                 program.operations.append(
-                    Operation(OpType.OpPush, file_path, line_num, eval_stack, types))
+                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
                 program.operations.append(
-                    Operation(OpType.OpPrint, file_path, line_num, [], []))
+                    Operation(OpType.OpPrint, token.file, token.line, [], []))
+                pass
+        else:
+            next_token = peek_token(tokens, state)
+            if next_token is not None:
+                tp = Primitives.Unknown
+                deref = False
 
-            # Other
+                word = token.word
+                file = token.file
+                line = token.line
+
+                if word[0] == "^":
+                    word = word[1:]
+                    deref = True
+
+                ip, opi = find_scope_with_symbol(word, program)
+
+                if ip == -1:
+                    if next_token.word != ":":
+                        report_error(f"Symbol `{word}` used before declaration",
+                                     token.file, token.line)
+
+                    consume_token(tokens, state)
+                    next_token = peek_token(tokens, state)
+
+                    if next_token.word != "=":
+                        token = consume_token(tokens, state)
+
+                        if token.word[0] == "^":
+                            tp = TypedPtr(parse_primitives(
+                                token.word[1:]))
+                        else:
+                            tp = parse_primitives(next_token.word)
+
+                        if tp == Primitives.Unknown:
+                            report_error(
+                                f"unkown type `{token.word}`",
+                                token.file, token.line)
+
+                        ip = find_local_scope(program)
+
+                        program.operations[ip].oprands.append(word)
+                        program.operations[ip].types.append(tp)
+                    else:
+                        not_implemented("type inference")
+                else:
+                    tp = program.operations[ip].types[opi]
+
+                next_token = peek_token(tokens, state)
+                if next_token.word == "=":
+                    consume_token(tokens, state)
+                    token = consume_token(tokens, state)
+
+                    eval_stack, types = parse_expression(
+                        token.word, program, token.file, token.line)
+
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file,
+                                  token.line, eval_stack, types))
+
+                    program.operations.append(
+                        Operation(OpType.OpMov, token.file,
+                                  token.line, [deref, word], [tp]))
+
             else:
-                print(f"{file_path}:{line_num}:")
-                print(f"Parsing Error: unexpected token `{line}`")
-                exit(1)
+                report_error(f"Expected token after `{token.word}`",
+                             file, line)
 
-        # End the global scope
-        program.operations.append(
-            Operation(OpType.OpEndScope, file_path, len(lines), [], []))
+    program.operations.append(
+        Operation(OpType.OpEndScope, file_path, tokens[-1].line, [], []))
 
     return program

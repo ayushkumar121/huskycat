@@ -1,4 +1,5 @@
 from typing import List
+from misc import report_error
 from parser import OpType, Program
 from static_types import Primitives, TypedPtr, Types, type_str
 
@@ -20,7 +21,7 @@ def compile_expression(value_stack: List, type_stack: List) -> str:
                     c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
                 else:
                     c_code += f"*(global_memory + {val})"
-                
+
                 deref = False
             else:
                 c_code += f"{val}"
@@ -60,10 +61,8 @@ def compile_operations(program: Program) -> str:
                 elif type(tp) == TypedPtr:
                     c_code += f"ptr {var};\n"
                 else:
-                    print(f"{op.file}:{op.line}:")
-                    print(
-                        f"Compiler Error : type {type_str(tp)} not defined for compilation")
-                    exit(1)
+                    report_error(
+                        "type {type_str(tp)} not defined for compilation", op.file, op.line)
 
         elif op.type == OpType.OpEndScope:
             c_code += "}\n"
@@ -133,10 +132,8 @@ def compile_operations(program: Program) -> str:
             elif type(tp) == TypedPtr:
                 c_code += f"print_ptr(\"{type_str(tp.primitive)}\", "
             else:
-                print(f"{op.file}:{op.line}:")
-                print(
-                    f"Compiler Error : print is not defined for following type")
-                exit(1)
+                report_error(
+                        "print is not defined for following type", op.file, op.line)
 
             c_code += compile_expression(value_stack, type_stack)
             c_code += ");\n"
