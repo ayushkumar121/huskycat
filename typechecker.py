@@ -120,7 +120,7 @@ def typecheck_program(program: Program):
 
                 if tp == Primitives.Untyped:
                     k,j = find_scope_with_symbol(val, program.operations[:ip])
-   
+
                     tp = program.operations[k].types[j]
                     op.types[len(op.oprands) - (i+1)] = tp
 
