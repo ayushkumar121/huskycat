@@ -15,28 +15,37 @@ class Var:
     value: bytes
 
 
-def apply_op_binary(a: int, b: int, op: str, tps: List[Types], global_memory: bytearray) -> int:
+def apply_op_binary(a: any, b: any, op: str, tps: List[Types], global_memory: bytearray) -> any:
+    val = 0
     if op == "+":
-        return b + a
+        val = b + a
     elif op == "-":
-        return b - a
+        val = b - a
     elif op == "/":
-        return b / a
+        val = b / a
     elif op == "*":
-        return b * a
+        val = b * a
     elif op == "%":
-        return b % a
+        val = b % a
     elif op == "||":
-        return 1 if (b or a) else 0
+        val = 1 if (b or a) else 0
     elif op == "&&":
-        return 1 if (b and a) else 0
+        val = 1 if (b and a) else 0
     elif op == "<":
-        return 1 if (b < a) else 0
+        val = 1 if (b < a) else 0
     elif op == ">":
-        return 1 if (b > a) else 0
+        val = 1 if (b > a) else 0
     elif op == "==":
-        return 1 if (b == a) else 0
-    return 0
+        val = 1 if (b == a) else 0
+
+    if tps[1] in [Primitives.I64, Primitives.I64]:
+        val = int(val)
+    elif tps[1] in [Primitives.F32, Primitives.F64]:
+        val = float(val)
+    else:
+        val = int(val)
+
+    return val
 
 
 def apply_op_uinary(a: int, op: str, tp: Types, global_memory: bytearray) -> int:
@@ -75,7 +84,7 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], tp_stack: L
 
 
 def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types],
-        global_memory: bytearray, file: str, line: int) -> tuple[List[int], List[Types]]:
+                   global_memory: bytearray, file: str, line: int) -> tuple[List[int], List[Types]]:
     l = len(type_stack)
 
     tp_stack = []
@@ -184,7 +193,6 @@ def interpret_program(program: Program):
 
                 if i != -1:
                     val = 0
-
 
                     if tp in [Primitives.I32,
                               Primitives.I64,

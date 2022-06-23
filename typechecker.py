@@ -5,7 +5,6 @@ from parser import OpType, Operation, Program
 from static_types import Primitives, TypedPtr, Types, type_str
 
 
-
 def find_scope_with_symbol(symbol: str, operations: Operation) -> tuple[int, int]:
     l = len(operations)
 
@@ -48,6 +47,13 @@ def evaluate_operation(type_stack: List[Types], ops_stack: List[str], file: str,
     if op in binary_operators:
         a = type_stack.pop()
         b = type_stack.pop()
+
+        if a != b:
+            value_types = [Primitives.F32, Primitives.F64,
+                           Primitives.I32, Primitives.I64]
+            if not (a in value_types and b in value_types) and not (type(b) == TypedPtr and a in [Primitives.I32, Primitives.I64]):
+                report_error(
+                    f"binary operation `{type_str(b)}{op}{type_str(a)}` not supported", file, line)
 
         type_stack.append(apply_op_binary_on_types(a, b, op))
 
@@ -99,7 +105,6 @@ def typecheck_program(program: Program):
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
-
     assert len(OpType) == 9, "Exhaustive handling of operations"
 
     for ip, op in enumerate(program.operations):
@@ -119,7 +124,7 @@ def typecheck_program(program: Program):
                 tp = op.types[len(op.oprands) - (i+1)]
 
                 if tp == Primitives.Untyped:
-                    k,j = find_scope_with_symbol(val, program.operations[:ip])
+                    k, j = find_scope_with_symbol(val, program.operations[:ip])
 
                     tp = program.operations[k].types[j]
                     op.types[len(op.oprands) - (i+1)] = tp
@@ -149,7 +154,7 @@ def typecheck_program(program: Program):
             found = type_stack.pop()
 
             if tp == Primitives.Untyped:
-                i,j = find_scope_with_symbol(symbol, program.operations[:ip])
+                i, j = find_scope_with_symbol(symbol, program.operations[:ip])
                 op.types[-1] = found
                 program.operations[i].types[j] = found
             elif tp != found:
