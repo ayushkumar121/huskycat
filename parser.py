@@ -66,9 +66,8 @@ def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
     skip = False
     for i, op in enumerate(program.operations[::-1]):
         if op.type == OpType.OpBeginScope:
-            if not skip:
-                if symbol in op.oprands:
-                    return l-(i+1), op.oprands.index(symbol)
+            if not skip and symbol in op.oprands:
+                return l-(i+1), op.oprands.index(symbol)
             skip = False
         elif op.type == OpType.OpEndScope:
             skip = True
@@ -133,6 +132,23 @@ def parse_int_literal(symbol: str) -> tuple[int, bool]:
     return num, True
 
 
+def parse_float_literal(symbol: str) -> tuple[float, bool]:
+    num = 0.0
+    tokens = symbol.split(".")
+
+    if len(tokens) == 2:
+        left_side, lok = parse_int_literal(tokens[0])
+        right_side, rok = parse_int_literal(tokens[1])
+
+        if lok and rok:
+            num = left_side
+            num = num + right_side*(1/10**len(tokens[1]))
+
+            return num, True
+
+    return 0.0, False
+
+
 def parse_bool_literal(symbol: str) -> tuple[int, bool]:
     if symbol == "true":
         return 1, True
@@ -145,13 +161,18 @@ def parse_bool_literal(symbol: str) -> tuple[int, bool]:
 def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Types]:
     word = word.strip()
 
-    num, is_int = parse_int_literal(word)
+    int_lit, is_int = parse_int_literal(word)
+    float_lit, is_float = parse_float_literal(word)
+
     what_bool, is_bool_literal = parse_bool_literal(word)
     op_index, p_index = find_scope_with_symbol(word, program)
 
     # Match int literals
     if is_int:
-        return num, Primitives.I64
+        return int_lit, Primitives.I64
+
+    elif is_float:
+        return float_lit, Primitives.F64
 
     # Match bool literals
     elif is_bool_literal:
@@ -219,7 +240,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
         return word, type
 
     else:
-        report_error("unrecognised word `{word}`", file, line)
+        report_error(f"unrecognised word `{word}`", file, line)
 
 
 def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Types]]:
@@ -244,7 +265,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
             operator = operator + ch
             if operator in operator_list:
                 eval_stack.append(operator)
-                type_stack.append(Primitives.Operator)
+                type_stack.append(Primitives.Untyped)
 
                 operator = ""
 
@@ -289,7 +310,7 @@ def parse_program_from_file(file_path: str) -> Program:
                       global_memory_capacity=1, operations=[])
 
     program.operations.append(
-        Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Unknown]))
+        Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Untyped]))
 
     state = [0]
     while state[0] < len(tokens):
@@ -364,7 +385,7 @@ def parse_program_from_file(file_path: str) -> Program:
 
             elif token.word == "{":
                 program.operations.append(
-                    Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Unknown]))
+                    Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Untyped]))
 
             elif token.word == "}":
                 i = 0
@@ -432,24 +453,23 @@ def parse_program_from_file(file_path: str) -> Program:
 
                     if next_token.word != "=":
                         token = consume_token(tokens, state)
-
                         if token.word[0] == "^":
                             tp = TypedPtr(parse_primitives(
                                 token.word[1:]))
                         else:
                             tp = parse_primitives(next_token.word)
-
-                        if tp == Primitives.Unknown:
-                            report_error(
-                                f"unkown type `{token.word}`",
-                                token.file, token.line)
-
-                        ip = find_local_scope(program)
-
-                        program.operations[ip].oprands.append(word)
-                        program.operations[ip].types.append(tp)
                     else:
-                        not_implemented("type inference")
+                        tp = Primitives.Untyped
+
+                    if tp == Primitives.Unknown:
+                        report_error(
+                            f"unkown type `{token.word}`",
+                            token.file, token.line)
+
+                    ip = find_local_scope(program)
+
+                    program.operations[ip].oprands.append(word)
+                    program.operations[ip].types.append(tp)
                 else:
                     tp = program.operations[ip].types[opi]
 
@@ -459,7 +479,8 @@ def parse_program_from_file(file_path: str) -> Program:
                     token = consume_token(tokens, state)
 
                     if token.word == "":
-                        report_error("expected expression after `=`", token.file, token.line)
+                        report_error("expected expression after `=`",
+                                     token.file, token.line)
 
                     eval_stack, types = parse_expression(
                         token.word, program, token.file, token.line)

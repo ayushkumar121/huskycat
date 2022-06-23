@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import struct
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Program
@@ -73,7 +74,8 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], tp_stack: L
         tp_stack.append(apply_op_uinary_on_types(a_tp, op))
 
 
-def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types], global_memory: bytearray, file: str, line: int) -> tuple[List[int], List[Types]]:
+def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types],
+        global_memory: bytearray, file: str, line: int) -> tuple[List[int], List[Types]]:
     l = len(type_stack)
 
     tp_stack = []
@@ -100,7 +102,7 @@ def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types], global_
 
             ops_stack.append(token)
 
-        elif type(token) == type(0):
+        elif type(token) == type(0) or type(token) == type(0.0):
             value_stack.append(token)
             tp_stack.append(type_stack[l - (i+1)])
 
@@ -183,13 +185,19 @@ def interpret_program(program: Program):
                 if i != -1:
                     val = 0
 
-                    if tp in [Primitives.I32, Primitives.I64, Primitives.Byte,
+
+                    if tp in [Primitives.I32,
+                              Primitives.I64,
+                              Primitives.Byte,
                               Primitives.Bool]:
                         val = int.from_bytes(
                             scopes[i][j].value, "big")
-                    elif tp in [Primitives.F32, Primitives.F64]:
-                        val = float.from_bytes(
-                            scopes[i][j].value, "big")
+
+                    elif tp == Primitives.F32:
+                        val = struct.unpack("f", bytes(scopes[i][j].value))
+
+                    elif tp == Primitives.F64:
+                        val = struct.unpack("d", bytes(scopes[i][j].value))[0]
 
                     elif type(tp) == TypedPtr:
                         val = int.from_bytes(
@@ -241,9 +249,13 @@ def interpret_program(program: Program):
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of_primitive(tp), "big")
 
-            elif tp in [Primitives.F32, Primitives.F64]:
-                scopes[i][j].value = float(value_stack.pop()).to_bytes(
-                    size_of_primitive(tp), "big")
+            elif tp == Primitives.F32:
+                scopes[i][j].value = bytearray(
+                    struct.pack("f", value_stack.pop()))
+
+            elif tp == Primitives.F64:
+                scopes[i][j].value = bytearray(
+                    struct.pack("d", value_stack.pop()))
 
             elif type(tp) == TypedPtr:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(

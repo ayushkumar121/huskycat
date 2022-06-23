@@ -9,6 +9,7 @@ class Primitives(Enum):
     F64 = auto()
     Bool = auto()
     Operator = auto()
+    Untyped = auto()
     Unknown = auto()
 
 @dataclass
@@ -40,7 +41,9 @@ def type_str(tp: Types) -> str:
         return "bool"
     elif tp == Primitives.Byte:
         return "byte"
+    elif type(tp) == Primitives.Untyped:
+        return f"defer"
     elif type(tp) == TypedPtr:
         return f"^{type_str(tp.primitive)}"
 
-    return "???"
+    return "unknown"
