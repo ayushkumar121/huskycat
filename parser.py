@@ -37,8 +37,7 @@ class OpType(Enum):
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
 
-    # # Calls a function
-    # OpCall = auto()
+    OpReturn = auto()
 
 
 @dataclass
@@ -52,14 +51,16 @@ class Operation:
 
 @dataclass
 class Function:
-    type: FuncType
+    memory_ptr: int
+    memory_capacity: int
+    signature: FuncType
     operations: List[Operation]
 
 
 @dataclass
 class Program:
-    global_memory_ptr: int
-    global_memory_capacity: int
+    memory_ptr: int
+    memory_capacity: int
     funcs: List[Function]
     operations: List[Operation]
 
@@ -101,8 +102,8 @@ def find_local_scope(program: Program, func_index: int) -> int:
 
 
 def alloc_mem(size: int, program: Program, func_index: int) -> int:
-    loc = program.global_memory_ptr
-    program.global_memory_ptr += size
+    loc = program.memory_ptr
+    program.memory_ptr += size
 
     i = find_local_scope(program, func_index)
 
@@ -111,8 +112,8 @@ def alloc_mem(size: int, program: Program, func_index: int) -> int:
     else:
         program.funcs[func_index].operations[i].oprands[0] += size
 
-    if program.global_memory_ptr > program.global_memory_capacity:
-        program.global_memory_capacity += size
+    if program.memory_ptr > program.memory_capacity:
+        program.memory_capacity += size
 
     return loc
 
@@ -258,14 +259,14 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
                 "([a-z][a-zA-Z0-9=+\-/*%()!&^|<>\[\]]*)\s*(?:,|$)", tokens[1])
             oprands = []
             types = []
-            
+
             for i in intokens:
                 eval_stack, tps = parse_expression(
                     i, program, func_index, file, line)
                 oprands.append(eval_stack)
                 types.append(tps)
 
-            return word, FuncCall(func=tokens[0], oprands=oprands, types=types)
+            return word, FuncCall(name=tokens[0], kind=FuncType(ins=[], outs=[]), oprands=oprands, types=types)
 
     # Match variables
     else:
@@ -387,8 +388,8 @@ keywords = ["if", "while", "else", "print", "{", "}", "->"]
 def parse_program_from_file(file_path: str) -> Program:
     tokens = lex_source(file_path)
 
-    program = Program(global_memory_ptr=1,
-                      global_memory_capacity=1,
+    program = Program(memory_ptr=1,
+                      memory_capacity=1,
                       funcs=[],
                       operations=[])
 
@@ -520,7 +521,7 @@ def parse_program_from_file(file_path: str) -> Program:
                     stack = []
 
                 i = find_local_scope(program, func_index)
-                program.global_memory_ptr -= program.operations[i].oprands[0]
+                program.memory_ptr -= program.operations[i].oprands[0]
 
                 if func_index == -1:
                     program.operations.append(
@@ -540,20 +541,34 @@ def parse_program_from_file(file_path: str) -> Program:
                 eval_stack, types = parse_expression(
                     token.word, program, func_index, token.file, token.line)
 
-                program.operations.append(
-                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+                if func_index == -1:
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
-                program.operations.append(
-                    Operation(OpType.OpPrint, token.file, token.line, [], []))
+                    program.operations.append(
+                        Operation(OpType.OpPrint, token.file, token.line, [], []))
+                else:
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpPrint, token.file, token.line, [], []))
 
             elif token.word == "->":
                 token = consume_token(tokens, state)
-                intokens = re.findall(
-                    "([a-z][a-zA-Z0-9=+\-/*%()!&^|<>\[\]]*)\s*(?:,|$)", token.word)
 
-                for t in intokens:
-                    eval_stack, types = parse_expression(
-                        t, program, func_index, token.file, token.line)
+                eval_stack, types = parse_expression(
+                    token.word, program, func_index, token.file, token.line)
+
+                if func_index == -1:
+                    report_error(
+                        "return cannot be called outside a function call", token.file, token.line)
+                else:
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpReturn, token.file, token.line, [func_index], [Primitives.Untyped]))
 
             else:
                 not_implemented(f"parsing of `{token.word}` keyword")
@@ -616,7 +631,7 @@ def parse_program_from_file(file_path: str) -> Program:
                     func_index = len(program.funcs)
                     skip_scope = False
                     program.funcs.append(
-                        Function(type=exp_type, operations=[]))
+                        Function(memory_capacity=1, memory_ptr=1, signature=exp_type, operations=[]))
 
                     program.operations.append(
                         Operation(OpType.OpPush, token.file,

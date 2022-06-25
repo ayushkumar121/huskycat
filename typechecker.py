@@ -1,4 +1,5 @@
 from pprint import pprint
+import re
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Operation, Program
@@ -109,9 +110,9 @@ def typecheck_program(program: Program):
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
-    assert len(OpType) == 9, "Exhaustive handling of operations"
+    assert len(OpType) == 10, "Exhaustive handling of operations"
 
-    ops = program.operations
+    ops = program.operations[:]
     for func in program.funcs:
         ops += func.operations
 
@@ -138,10 +139,12 @@ def typecheck_program(program: Program):
                     op.types[len(op.oprands) - (i+1)] = tp
 
                 if type(tp) == FuncCall:
-                    k, j = find_scope_with_symbol(tp.func, program.operations[:ip])
+                    k, j = find_scope_with_symbol(
+                        tp.name, program.operations[:ip])
 
                     tp = program.operations[k].types[j].outs[:].pop()
-                    op.types[len(op.oprands) - (i+1)] = tp
+                    op.types[len(op.oprands) - (i+1)
+                             ].kind = program.operations[k].types[j]
 
                 value_stack.append(val)
                 type_stack.append(tp)
@@ -227,3 +230,21 @@ def typecheck_program(program: Program):
 
             value_stack.pop()
             op.types.append(type_stack.pop())
+
+        elif op.type == OpType.OpReturn:
+            if len(type_stack) == 0:
+                report_error(
+                    f"attempting to typecheck an empty typestack", op.file, op.line)
+
+            value_stack, type_stack = evaluate_stack(
+                value_stack, type_stack, op.file, op.line)
+
+            func_index = op.oprands[-1]
+            return_type = program.funcs[func_index].signature.outs[:].pop()
+
+            value_stack.pop()
+            found = type_stack.pop()
+            if found != return_type:
+                report_error(
+                    f"unexpected return type for function expected `{type_str(return_type)}` found `{type_str(found)}`", op.file, op.line)
+            pass

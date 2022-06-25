@@ -149,7 +149,7 @@ def interpret_program(program: Program):
     value_stack: List[int | str] = []
     scopes: List[List[Var]] = []
 
-    global_memory = bytearray(program.global_memory_capacity)
+    global_memory = bytearray(program.memory_capacity)
 
     assert len(OpType) == 9, "Exhaustive handling of operations"
 
@@ -178,7 +178,7 @@ def interpret_program(program: Program):
                                     bytearray(size_of_primitive(Primitives.I64))))
                 else:
                     report_error(
-                        f"definition of type {type_str(tp)} not defined", op.file, op.line)
+                        f"definition of type `{type_str(tp)}` not defined", op.file, op.line)
 
             scopes.append(vars)
             ip += 1
@@ -245,7 +245,7 @@ def interpret_program(program: Program):
                 deref_index = int.from_bytes(
                     scopes[i][j].value, "big")
 
-                if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory_ptr - 1:
+                if deref_index + size_of_primitive(tp.primitive)-1 > program.memory_ptr - 1:
                         report_error(
                             f"trying to access unallocated memory", op.file, op.line)
 

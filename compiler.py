@@ -1,10 +1,11 @@
+from calendar import c
 from typing import List
 from misc import report_error
-from parser import OpType, Program
-from static_types import Primitives, TypedPtr, Types, type_str
+from parser import Function, OpType, Program
+from static_types import FuncCall, FuncType, Primitives, TypedPtr, Types, type_str
 
 
-def compile_expression(value_stack: List, type_stack: List) -> str:
+def compile_expression(value_stack: List, type_stack: List[Types]) -> str:
     c_code = ""
     deref = False
 
@@ -16,29 +17,45 @@ def compile_expression(value_stack: List, type_stack: List) -> str:
         if val == "^":
             deref = True
         else:
-            if deref and type(tp) == TypedPtr:
-                c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
-                deref = False
+            if type(tp) == TypedPtr:
+                if deref:
+                    c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
+                    deref = False
+                else:
+                    c_code += f"{val}"
+            elif type(tp) == FuncCall:
+                oprands = []
+                out = type_str(tp.kind.outs[:].pop())
+                ins = ",".join([type_str(opr) for opr in tp.kind.ins])
+
+                c_code += f"(({out} (*)({ins}) )(funcs[{tp.name}]))("
+                for i, opr in enumerate(tp.oprands):
+                    oprands.append(compile_expression(opr, tp.types[i]))
+                c_code += ",".join(oprands)
+                c_code += f")"
             else:
                 c_code += f"{val}"
 
     return c_code
 
 
-def compile_operations(program: Program) -> str:
+def compile_operations(program: Program | Function) -> str:
     c_code = ""
 
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
-    assert len(OpType) == 9, "Exhaustive handling of operations"
+    assert len(OpType) == 10, "Exhaustive handling of operations"
 
     for op in program.operations:
 
         if op.type == OpType.OpBeginScope:
             c_code += "{\n"
 
-            while len(op.oprands[1:]) > 0:
+            is_func = type(program) == Function
+            n = len(program.signature.ins) if is_func else 0
+
+            while len(op.oprands[1+n:]) > 0:
                 var = op.oprands.pop()
                 tp = op.types.pop()
 
@@ -56,9 +73,11 @@ def compile_operations(program: Program) -> str:
                     c_code += f"byte {var};\n"
                 elif type(tp) == TypedPtr:
                     c_code += f"ptr {var};\n"
+                elif type(tp) == FuncType:
+                    c_code += f"ptr {var};\n"
                 else:
                     report_error(
-                        "type {type_str(tp)} not defined for compilation", op.file, op.line)
+                        f"type `{type_str(tp)}` not defined for compilation", op.file, op.line)
 
         elif op.type == OpType.OpEndScope:
             c_code += "}\n"
@@ -131,6 +150,12 @@ def compile_operations(program: Program) -> str:
             c_code += compile_expression(value_stack, type_stack)
             c_code += ");\n"
 
+        elif op.type == OpType.OpReturn:
+            c_code += "return "
+            c_code += compile_expression(value_stack, type_stack)
+            c_code += ";\n"
+            pass
+
     return c_code
 
 
@@ -161,9 +186,25 @@ void print_byte(byte a) {printf(\"%c\", a);}
 
 void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
 
-int main() {
 """
-    c_code += f"byte global_memory[{program.global_memory_capacity}];\n"
+    c_code += f"byte global_memory[{program.memory_capacity}];\n"
+
+    for i, func in enumerate(program.funcs):
+        out = func.signature.outs[:].pop()
+        ins = ",".join(
+            [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
+
+        c_code += f"{type_str(out)} func_{i}({ins})"
+        c_code += "\n{\n"
+        c_code += compile_operations(func)
+        c_code += "}\n"
+
+    c_code += "ptr funcs[]={\n"
+    for i, func in enumerate(program.funcs):
+        c_code += f"(ptr)func_{i}\n"
+    c_code += "};\n"
+
+    c_code += "int main() {\n"
     c_code += compile_operations(program)
     c_code += """return 0;
 }
