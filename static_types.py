@@ -28,7 +28,7 @@ class FuncType():
 @dataclass
 class FuncCall():
     name: str
-    kind: FuncType
+    signature: FuncType
     oprands: List[List[int|str]]
     types: List[List[Primitives | TypedPtr | FuncType]]
 

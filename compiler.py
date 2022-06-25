@@ -25,8 +25,8 @@ def compile_expression(value_stack: List, type_stack: List[Types]) -> str:
                     c_code += f"{val}"
             elif type(tp) == FuncCall:
                 oprands = []
-                out = type_str(tp.kind.outs[:].pop())
-                ins = ",".join([type_str(opr) for opr in tp.kind.ins])
+                out = type_str(tp.signature.outs[:].pop())
+                ins = ",".join([type_str(opr) for opr in tp.signature.ins])
 
                 c_code += f"(({out} (*)({ins}) )(funcs[{tp.name}]))("
                 for i, opr in enumerate(tp.oprands):

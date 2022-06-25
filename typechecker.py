@@ -2,7 +2,7 @@ from pprint import pprint
 import re
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
-from parser import OpType, Operation, Program
+from parser import Function, OpType, Operation, Program
 from static_types import FuncCall, Primitives, TypedPtr, Types, type_str
 
 
@@ -105,18 +105,19 @@ def evaluate_stack(eval_stack: List[int | str],
             f"unable to type evaluate following stack {eval_stack}", file, line)
     return [0], type_stack
 
-
 def typecheck_program(program: Program):
+    for func in program.funcs:
+        typecheck_operations(func)
+
+    typecheck_operations(program)
+
+def typecheck_operations(program: Program | Function):
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
     assert len(OpType) == 10, "Exhaustive handling of operations"
 
-    ops = program.operations[:]
-    for func in program.funcs:
-        ops += func.operations
-
-    for ip, op in enumerate(ops):
+    for ip, op in enumerate(program.operations[:]):
 
         if op.type == OpType.OpBeginScope:
             pass
@@ -144,7 +145,36 @@ def typecheck_program(program: Program):
 
                     tp = program.operations[k].types[j].outs[:].pop()
                     op.types[len(op.oprands) - (i+1)
-                             ].kind = program.operations[k].types[j]
+                             ].signature = program.operations[k].types[j]
+
+                    expected = program.operations[k].types[j].ins
+                    found_stack = []
+
+                    oprands = op.types[len(op.oprands) - (i+1)].oprands
+                    types = op.types[len(op.oprands) - (i+1)].types
+
+                    for k, opr in enumerate(oprands):
+                        t = Primitives.Untyped
+                        vals, tps = evaluate_stack(
+                            opr, types[k], op.file, op.line)
+
+                        v = vals.pop()
+                        t = tps.pop()
+                        if t == Primitives.Untyped:
+                            ipr, oprr = find_scope_with_symbol(
+                                opr[-1], program.operations[:ip])
+                                
+                            t = program.operations[ipr].types[oprr]
+
+                        found_stack.append(t)
+
+                    if expected != found_stack:
+                        expected_str = ",".join(
+                            [type_str(t) for t in expected])
+                        found_str = ",".join([type_str(t)
+                                             for t in found_stack])
+                        report_error(
+                            f"unexpected function call expected ({expected_str}) but found ({found_str})", op.file, op.line)
 
                 value_stack.append(val)
                 type_stack.append(tp)
@@ -239,8 +269,7 @@ def typecheck_program(program: Program):
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)
 
-            func_index = op.oprands[-1]
-            return_type = program.funcs[func_index].signature.outs[:].pop()
+            return_type = program.signature.outs[:].pop()
 
             value_stack.pop()
             found = type_stack.pop()

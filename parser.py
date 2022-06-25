@@ -266,7 +266,7 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
                 oprands.append(eval_stack)
                 types.append(tps)
 
-            return word, FuncCall(name=tokens[0], kind=FuncType(ins=[], outs=[]), oprands=oprands, types=types)
+            return word, FuncCall(name=tokens[0], signature=FuncType(ins=[], outs=[]), oprands=oprands, types=types)
 
     # Match variables
     else:
