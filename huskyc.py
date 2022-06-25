@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from pprint import pprint
 import subprocess
 import sys
 import copy
@@ -47,8 +48,7 @@ def main() -> int:
         program = parse_program_from_file(sys.argv[2])
         typecheck_program(program)
 
-        for ip, op in enumerate(program.operations):
-            print(f"{ip}:{op.file}:{op.line}", op.type, op.oprands, op.types)
+        pprint(program)
 
     elif sys.argv[1] == "compile":
         if len(sys.argv) < 3:

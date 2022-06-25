@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from pprint import pprint
 import re
-from typing import List
+from typing import List, Tuple
 from lexer import Token, lex_source
 
 from misc import not_implemented, operator_list, report_error
-from static_types import Primitives, TypedPtr, Types, size_of_primitive
+from static_types import FuncType, Primitives, TypedPtr, Types, size_of_primitive
 
 
 class OpType(Enum):
@@ -48,23 +48,27 @@ class Operation:
 
 
 @dataclass
-class Memory:
-    count: int
-    primitive: Primitives
+class Function:
+    type: FuncType
+    operations: List[Operation]
 
 
 @dataclass
 class Program:
     global_memory_ptr: int
     global_memory_capacity: int
+    funcs: List[Function]
     operations: List[Operation]
 
 
-def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
-    l = len(program.operations)
+def find_scope_with_symbol(symbol: str, program: Program, func_index: int) -> tuple[int, int]:
+    ops = program.operations[::-1] if func_index == - \
+        1 else program.funcs[func_index].operations[::-1]
+    
+    l = len(ops)
 
     skip = False
-    for i, op in enumerate(program.operations[::-1]):
+    for i, op in enumerate(ops):
         if op.type == OpType.OpBeginScope:
             if not skip and symbol in op.oprands:
                 return l-(i+1), op.oprands.index(symbol)
@@ -75,11 +79,14 @@ def find_scope_with_symbol(symbol: str, program: Program) -> tuple[int, int]:
     return -1, -1
 
 
-def find_local_scope(program: Program) -> int:
-    l = len(program.operations)
+def find_local_scope(program: Program, func_index: int) -> int:
+    ops = program.operations[::-1] if func_index == - \
+        1 else program.funcs[func_index].operations[::-1]
+
+    l = len(ops)
 
     skip = False
-    for i, op in enumerate(program.operations[::-1]):
+    for i, op in enumerate(ops):
         if op.type == OpType.OpBeginScope:
             if not skip:
                 return l-(i+1)
@@ -90,12 +97,16 @@ def find_local_scope(program: Program) -> int:
     return -1
 
 
-def alloc_mem(size: int, program: Program) -> int:
+def alloc_mem(size: int, program: Program, func_index: int) -> int:
     loc = program.global_memory_ptr
     program.global_memory_ptr += size
 
-    i = find_local_scope(program)
-    program.operations[i].oprands[0] += size
+    i = find_local_scope(program, func_index)
+
+    if func_index == -1:
+        program.operations[i].oprands[0] += size
+    else:
+        program.funcs[func_index].operations[i].oprands[0] += size
 
     if program.global_memory_ptr > program.global_memory_capacity:
         program.global_memory_capacity += size
@@ -158,14 +169,13 @@ def parse_bool_literal(symbol: str) -> tuple[int, bool]:
     return 0, False
 
 
-def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int | str, Types]:
+def parse_word(word: str, program: Program, func_index: int, file: str, line: int) -> tuple[int | str, Types]:
     word = word.strip()
 
     int_lit, is_int = parse_int_literal(word)
     float_lit, is_float = parse_float_literal(word)
 
     what_bool, is_bool_literal = parse_bool_literal(word)
-    op_index, p_index = find_scope_with_symbol(word, program)
 
     # Match int literals
     if is_int:
@@ -194,7 +204,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
             report_error(
                 f"unknown type `{tp[0]}`", file, line)
 
-        return alloc_mem(size_of_primitive(primitive), program), TypedPtr(primitive)
+        return alloc_mem(size_of_primitive(primitive), program, func_index), TypedPtr(primitive)
 
     # Match arrays
     elif re.fullmatch("\[[0-9]+\].*", word):
@@ -212,7 +222,7 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
             report_error(
                 f"unknown type `{tp[0]}`", file, line)
 
-        return alloc_mem(size_of_primitive(primitive) * size, program), TypedPtr(primitive)
+        return alloc_mem(size_of_primitive(primitive) * size, program, func_index), TypedPtr(primitive)
 
     # Match characters
     elif re.fullmatch("'\\\?.'", word):
@@ -234,16 +244,21 @@ def parse_word(word: str, program: Program, file: str, line: int) -> tuple[int |
             report_error(
                 f"no character inside character brackets", file, line)
 
-    # Match variables
-    elif op_index != -1:
-        type = program.operations[op_index].types[p_index]
-        return word, type
-
     else:
-        report_error(f"unrecognised word `{word}`", file, line)
+        # Match variables
+        op_index, p_index = find_scope_with_symbol(word, program, func_index)
+        if op_index != -1:
+            tp = Primitives.Unknown
+            if func_index == -1:
+                tp = program.operations[op_index].types[p_index]
+            else:
+                tp = program.funcs[func_index].operations[op_index].types[p_index]
+            return word, tp
+        else:
+            report_error(f"unrecognised word in expression `{word}`", file, line)
 
 
-def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[List[int | str], List[Types]]:
+def parse_expression(exp: str, program: Program, func_index: int, file: str, line: int) -> tuple[List[int | str], List[Types]]:
     eval_stack: List[int | str] = []
     type_stack: List[Primitives] = []
 
@@ -253,9 +268,9 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
     for i, ch in enumerate(exp):
 
         # Matching operators
-        if ch in "=+-/*%()!&^|<>":
+        if ch in "=+-/*%()!&^|<>[]":
             if word != "":
-                eval, type = parse_word(word, program, file, line)
+                eval, type = parse_word(word, program, func_index, file, line)
 
                 eval_stack.append(eval)
                 type_stack.append(type)
@@ -277,7 +292,7 @@ def parse_expression(exp: str, program: Program, file: str, line: int) -> tuple[
 
         if i == len(exp) - 1:
             if word != "":
-                eval, type = parse_word(word, program, file, line)
+                eval, type = parse_word(word, program, func_index, file, line)
 
                 eval_stack.append(eval)
                 type_stack.append(type)
@@ -300,19 +315,57 @@ def peek_token(tokens: List[Token], i: List[int]) -> Token | None:
     return token
 
 
-keywords = ["if", "while", "else", "print", "{", "}"]
+def parse_functype(tokens: List[Token], state: List[int], file: str, line: int) -> Tuple[List[str], FuncType]:
+    ins: Types = []
+    outs: Types = []
+    vars: List[str] = []
+
+    token = consume_token(tokens, state)
+    intokens = re.findall("([a-z][a-zA-Z0-9:]*)\s*(?:,|$)", token.word)
+
+    for i in intokens:
+        var_info = str(i).split(":")
+
+        if len(var_info) != 2:
+            report_error("unexpected function declaration", file, line)
+
+        vars.append(var_info[0])
+        if var_info[1][0] == "^":
+            ins.append(TypedPtr(parse_primitives(var_info[1][1:])))
+        else:
+            ins.append(parse_primitives(var_info[1]))
+
+    token = consume_token(tokens, state)
+    outtokens = re.findall(
+        "([a-z][a-zA-Z0-9]*)\s*(?:,|$)", token.word)
+
+    for i in outtokens:
+        if i[0] == "^":
+            outs.append(TypedPtr(parse_primitives(i[1:])))
+        else:
+            outs.append(parse_primitives(i))
+
+    return vars, FuncType(ins, outs)
+
+
+keywords = ["if", "while", "else", "print", "{", "}", "->"]
 
 
 def parse_program_from_file(file_path: str) -> Program:
     tokens = lex_source(file_path)
 
     program = Program(global_memory_ptr=1,
-                      global_memory_capacity=1, operations=[])
+                      global_memory_capacity=1,
+                      funcs=[],
+                      operations=[])
 
     program.operations.append(
         Operation(OpType.OpBeginScope, file_path, 1, [0], [Primitives.Untyped]))
 
     state = [0]
+    func_index = -1
+    skip_scope = False
+
     while state[0] < len(tokens):
         token = consume_token(tokens, state)
 
@@ -321,16 +374,22 @@ def parse_program_from_file(file_path: str) -> Program:
                 token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    token.word, program, token.file, token.line)
+                    token.word, program, func_index, token.file, token.line)
 
-                program.operations.append(
-                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+                if func_index == -1:
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
-                program.operations.append(
-                    Operation(OpType.OpIf, token.file, token.line, [], []))
+                    program.operations.append(
+                        Operation(OpType.OpIf, token.file, token.line, [], []))
+                else:
+                    program.funcs[i].operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+
+                    program.funcs[i].operations.append(
+                        Operation(OpType.OpIf, token.file, token.line, [], []))
 
             elif token.word == "else":
-
                 top_op = program.operations[-1]
 
                 if top_op.type != OpType.OpEndScope:
@@ -360,13 +419,20 @@ def parse_program_from_file(file_path: str) -> Program:
                     token = consume_token(tokens, state)
 
                     eval_stack, types = parse_expression(
-                        token.word, program, token.file, token.line)
+                        token.word, program, func_index, token.file, token.line)
 
-                    program.operations.append(
-                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+                    if func_index == -1:
+                        program.operations.append(
+                            Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
-                    program.operations.append(
-                        Operation(OpType.OpElseIf, token.file, token.line, [], []))
+                        program.operations.append(
+                            Operation(OpType.OpElseIf, token.file, token.line, [], []))
+                    else:
+                        program.funcs[func_index].operations.append(
+                            Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+
+                        program.funcs[func_index].operations.append(
+                            Operation(OpType.OpElseIf, token.file, token.line, [], []))
                 else:
                     program.operations.append(
                         Operation(OpType.OpElse, token.file, token.line, [], []))
@@ -375,17 +441,29 @@ def parse_program_from_file(file_path: str) -> Program:
                 token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    token.word, program, token.file, token.line)
+                    token.word, program, func_index, token.file, token.line)
 
-                program.operations.append(
-                    Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+                if func_index == -1:
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
-                program.operations.append(
-                    Operation(OpType.OpWhile, token.file, token.line, [], []))
+                    program.operations.append(
+                        Operation(OpType.OpWhile, token.file, token.line, [], []))
+                else:
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
+
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpWhile, token.file, token.line, [], []))
 
             elif token.word == "{":
-                program.operations.append(
-                    Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Untyped]))
+                if func_index == -1:
+                    program.operations.append(
+                        Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Untyped]))
+                else:
+                    skip_scope = True
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpBeginScope, token.file, token.line, [0], [Primitives.Untyped]))
 
             elif token.word == "}":
                 i = 0
@@ -408,25 +486,44 @@ def parse_program_from_file(file_path: str) -> Program:
                 elif op_type == OpType.OpIf:
                     stack = []
 
-                i = find_local_scope(program)
+                i = find_local_scope(program, func_index)
                 program.global_memory_ptr -= program.operations[i].oprands[0]
 
-                program.operations.append(
-                    Operation(OpType.OpEndScope, token.file, token.line, stack, []))
-                pass
+                if func_index == -1:
+                    program.operations.append(
+                        Operation(OpType.OpEndScope, token.file, token.line, stack, []))
+                else:
+                    if skip_scope:
+                        skip_scope = False
+                    else:
+                        func_index = -1
+
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpEndScope, token.file, token.line, stack, []))
 
             elif token.word == "print":
                 token = consume_token(tokens, state)
 
                 eval_stack, types = parse_expression(
-                    token.word, program, token.file, token.line)
+                    token.word, program, func_index, token.file, token.line)
 
                 program.operations.append(
                     Operation(OpType.OpPush, token.file, token.line, eval_stack, types))
 
                 program.operations.append(
                     Operation(OpType.OpPrint, token.file, token.line, [], []))
-                pass
+
+            elif token.word == "->":
+                token = consume_token(tokens, state)
+                intokens = re.findall(
+                    "([a-z][a-zA-Z0-9=+\-/*%()!&^|<>\[\]]*)\s*(?:,|$)", token.word)
+
+                for t in intokens:
+                    eval_stack, types = parse_expression(
+                        t, program, func_index, token.file, token.line)
+
+            else:
+                not_implemented(f"parsing of `{token.word}` keyword")
         else:
             next_token = peek_token(tokens, state)
             if next_token is not None:
@@ -441,7 +538,7 @@ def parse_program_from_file(file_path: str) -> Program:
                     word = word[1:]
                     deref = True
 
-                ip, opi = find_scope_with_symbol(word, program)
+                ip, opi = find_scope_with_symbol(word, program, func_index)
 
                 if ip == -1:
                     if next_token.word != ":":
@@ -466,32 +563,46 @@ def parse_program_from_file(file_path: str) -> Program:
                             f"unkown type `{token.word}`",
                             token.file, token.line)
 
-                    ip = find_local_scope(program)
+                    ip = find_local_scope(program, func_index)
 
                     program.operations[ip].oprands.append(word)
                     program.operations[ip].types.append(tp)
                 else:
                     tp = program.operations[ip].types[opi]
 
-                next_token = peek_token(tokens, state)
-                if next_token is not None and next_token.word == "=":
+                consume_token(tokens, state)
+                token = consume_token(tokens, state)
+
+                if token.word == "":
+                    report_error("expected expression after `=`",
+                                 token.file, token.line)
+                elif token.word == "func":
+                    vars, tp = parse_functype(
+                        tokens, state, token.file, token.line)
+
+                    func_index = len(program.funcs)
+                    skip_scope = False
+                    program.funcs.append(Function(type=tp, operations=[]))
+
+                    program.operations.append(
+                        Operation(OpType.OpPush, token.file,
+                                  token.line, [func_index], [tp]))
+
+                    program.funcs[func_index].operations.append(
+                        Operation(OpType.OpBeginScope, token.file, token.line, [0] + vars, [Primitives.Untyped] + tp.ins))
+
                     consume_token(tokens, state)
-                    token = consume_token(tokens, state)
-
-                    if token.word == "":
-                        report_error("expected expression after `=`",
-                                     token.file, token.line)
-
+                else:
                     eval_stack, types = parse_expression(
-                        token.word, program, token.file, token.line)
+                        token.word, program, func_index, token.file, token.line)
 
                     program.operations.append(
                         Operation(OpType.OpPush, token.file,
                                   token.line, eval_stack, types))
 
-                    program.operations.append(
-                        Operation(OpType.OpMov, token.file,
-                                  token.line, [deref, word], [tp]))
+                program.operations.append(
+                    Operation(OpType.OpMov, token.file,
+                              token.line, [deref, word], [tp]))
 
             else:
                 report_error(f"Expected token after `{token.word}`",

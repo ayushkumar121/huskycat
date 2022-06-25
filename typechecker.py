@@ -20,21 +20,25 @@ def find_scope_with_symbol(symbol: str, operations: Operation) -> tuple[int, int
     return -1, -1
 
 
-def apply_op_binary_on_types(a: Types, b: Types, op: str) -> Types:
+def apply_op_binary_on_types(a: Types, b: Types, op: str, file: str, line: int) -> Types:
     if op in ["+",  "-", "*", "/"]:
         return b
     elif op == "%":
         return Primitives.I64
-    elif op in ["||", "&&", ">", "<", "=="]:
+    elif op in ["||", "&&", ">", "<", "==", "!="]:
         return Primitives.Bool
 
     return Primitives.Unknown
 
 
-def apply_op_uinary_on_types(a: Types, op: str) -> Types:
+def apply_op_uinary_on_types(a: Types, op: str, file: str, line: int) -> Types:
     if op == "!":
         return Primitives.Bool
     elif op == "^":
+        if type(a) != TypedPtr:
+            report_error(
+                f"cannot deref type `{type_str(a)}`", file, line)
+
         return a.primitive
 
     return Primitives.Unknown
@@ -55,12 +59,12 @@ def evaluate_operation(type_stack: List[Types], ops_stack: List[str], file: str,
                 report_error(
                     f"binary operation `{type_str(b)}{op}{type_str(a)}` not supported", file, line)
 
-        type_stack.append(apply_op_binary_on_types(a, b, op))
+        type_stack.append(apply_op_binary_on_types(a, b, op, file, line))
 
     # Uninary operators
     elif op in unary_operators:
         a = type_stack.pop()
-        type_stack.append(apply_op_uinary_on_types(a, op))
+        type_stack.append(apply_op_uinary_on_types(a, op, file, line))
 
 
 def evaluate_stack(eval_stack: List[int | str],
@@ -133,6 +137,10 @@ def typecheck_program(program: Program):
                 type_stack.append(tp)
 
         elif op.type == OpType.OpMov:
+            if len(type_stack) == 0:
+                report_error(
+                    f"attempting to typecheck an empty typestack", op.file, op.line)
+
             symbol = op.oprands[-1]
             deref = op.oprands[-2]
             tp = op.types[-1]
@@ -141,11 +149,8 @@ def typecheck_program(program: Program):
                 if type(tp) == TypedPtr:
                     tp = tp.primitive
                 else:
-                    tp = Primitives.Byte
-
-            # if len(type_stack) == 0:
-            #     report_error(
-            #         f"attempting to typecheck an empty typestack", op.file, op.line)
+                    report_error(
+                        f"cannot deref type `{type_str(tp)}`", op.file, op.line)
 
             value_stack, type_stack = evaluate_stack(
                 value_stack, type_stack, op.file, op.line)

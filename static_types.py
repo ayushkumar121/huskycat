@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import List
+
 
 class Primitives(Enum):
     Byte = auto()
@@ -12,11 +14,20 @@ class Primitives(Enum):
     Untyped = auto()
     Unknown = auto()
 
+
 @dataclass
 class TypedPtr():
     primitive: Primitives
 
-Types = Primitives | TypedPtr
+
+@dataclass
+class FuncType():
+    ins: List[Primitives | TypedPtr]
+    outs: List[Primitives | TypedPtr]
+
+
+Types = Primitives | TypedPtr | FuncType
+
 
 def size_of_primitive(primitive: Primitives) -> int:
     if primitive in [Primitives.I32, Primitives.F32]:
@@ -28,6 +39,7 @@ def size_of_primitive(primitive: Primitives) -> int:
 
     return 8
 
+
 def type_str(tp: Types) -> str:
     if tp == Primitives.I32:
         return "i32"
@@ -35,8 +47,8 @@ def type_str(tp: Types) -> str:
         return "i64"
     elif tp == Primitives.F32:
         return "f32"
-    elif tp ==Primitives.F64:
-        return  "f64"
+    elif tp == Primitives.F64:
+        return "f64"
     elif tp == Primitives.Bool:
         return "bool"
     elif tp == Primitives.Byte:
@@ -45,5 +57,9 @@ def type_str(tp: Types) -> str:
         return f"defer"
     elif type(tp) == TypedPtr:
         return f"^{type_str(tp.primitive)}"
+    elif type(tp) == FuncType:
+        ins = ",".join([type_str(t) for t in tp.ins])
+        outs = ",".join([type_str(t) for t in tp.outs])
 
+        return f"func({ins}) -> ({outs})"
     return "unknown"

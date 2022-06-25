@@ -16,12 +16,8 @@ def compile_expression(value_stack: List, type_stack: List) -> str:
         if val == "^":
             deref = True
         else:
-            if deref:
-                if type(tp) == TypedPtr:
-                    c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
-                else:
-                    c_code += f"*(global_memory + {val})"
-
+            if deref and type(tp) == TypedPtr:
+                c_code += f"*(({type_str(tp.primitive)}*)(global_memory + {val}))"
                 deref = False
             else:
                 c_code += f"{val}"
@@ -82,12 +78,9 @@ def compile_operations(program: Program) -> str:
             tp = op.types[-1]
 
             c_code += "{\n"
-            if deref:
-                if type(tp) == TypedPtr:
-                    c_code += f"{type_str(tp.primitive)} *tmp_cast=({type_str(tp.primitive)}*)(global_memory+{var});\n"
-                    c_code += f"*tmp_cast="
-                else:
-                    c_code += f"global_memory[{var}]="
+            if deref and type(tp) == TypedPtr:
+                c_code += f"{type_str(tp.primitive)} *tmp_cast=({type_str(tp.primitive)}*)(global_memory+{var});\n"
+                c_code += f"*tmp_cast="
             else:
                 c_code += f"{var}="
 
@@ -133,7 +126,7 @@ def compile_operations(program: Program) -> str:
                 c_code += f"print_ptr(\"{type_str(tp.primitive)}\", "
             else:
                 report_error(
-                        "print is not defined for following type", op.file, op.line)
+                    "print is not defined for following type", op.file, op.line)
 
             c_code += compile_expression(value_stack, type_stack)
             c_code += ");\n"

@@ -15,7 +15,7 @@ class Var:
     value: bytes
 
 
-def apply_op_binary(a: any, b: any, op: str, tps: List[Types], global_memory: bytearray) -> any:
+def apply_op_binary(a: any, b: any, op: str, tps: List[Types], global_memory: bytearray, file: str, line: int) -> any:
     val = 0
     if op == "+":
         val = b + a
@@ -37,6 +37,8 @@ def apply_op_binary(a: any, b: any, op: str, tps: List[Types], global_memory: by
         val = 1 if (b > a) else 0
     elif op == "==":
         val = 1 if (b == a) else 0
+    elif op == "==":
+        val = 1 if (b != a) else 0
 
     if tps[1] in [Primitives.I64, Primitives.I64]:
         val = int(val)
@@ -48,14 +50,15 @@ def apply_op_binary(a: any, b: any, op: str, tps: List[Types], global_memory: by
     return val
 
 
-def apply_op_uinary(a: int, op: str, tp: Types, global_memory: bytearray) -> int:
+def apply_op_uinary(a: int, op: str, tp: Types, global_memory: bytearray, file: str, line: int) -> int:
     if op == "!":
         return 1 if (not a) else 0
     elif op == "^":
-        if type(tp) == TypedPtr:
-            return int.from_bytes(global_memory[a:a+size_of_primitive(tp.primitive)], "big")
-        else:
-            return global_memory[a]
+        if type(tp) != TypedPtr:
+            report_error(
+                f"cannot deref type `{type_str(a)}`", file, line)
+
+        return int.from_bytes(global_memory[a:a+size_of_primitive(tp.primitive)], "big")
     return 0
 
 
@@ -71,16 +74,17 @@ def evaluate_operation(value_stack: List[int], ops_stack: List[str], tp_stack: L
         b_tp = tp_stack.pop()
 
         value_stack.append(apply_op_binary(
-            a, b, op, [a_tp, b_tp], global_memory))
-        tp_stack.append(apply_op_binary_on_types(a_tp, b_tp, op))
+            a, b, op, [a_tp, b_tp], global_memory, file, line))
+        tp_stack.append(apply_op_binary_on_types(a_tp, b_tp, op, file, line))
 
     # Uninary operators
     elif op in unary_operators:
         a = value_stack.pop()
         a_tp = tp_stack.pop()
 
-        value_stack.append(apply_op_uinary(a, op, a_tp, global_memory))
-        tp_stack.append(apply_op_uinary_on_types(a_tp, op))
+        value_stack.append(apply_op_uinary(
+            a, op, a_tp, global_memory, file, line))
+        tp_stack.append(apply_op_uinary_on_types(a_tp, op, file, line))
 
 
 def evaluate_stack(eval_stack: List[int | str], type_stack: List[Types],
@@ -237,21 +241,15 @@ def interpret_program(program: Program):
                 deref_index = int.from_bytes(
                     scopes[i][j].value, "big")
 
-                if type(tp) == TypedPtr:
-                    if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory_ptr - 1:
+                if deref_index + size_of_primitive(tp.primitive)-1 > program.global_memory_ptr - 1:
                         report_error(
                             f"trying to access unallocated memory", op.file, op.line)
 
-                    bts = int(value_stack.pop()).to_bytes(
+                bts = int(value_stack.pop()).to_bytes(
                         size_of_primitive(tp.primitive), "big")
-                    for i, bt in enumerate(bts):
+                
+                for i, bt in enumerate(bts):
                         global_memory[deref_index + i] = bt
-                else:
-                    if deref_index > program.global_memory_ptr - 1:
-                        report_error(
-                            f"trying to access unallocated memory", op.file, op.line)
-
-                    global_memory[deref_index] = int(value_stack.pop())
 
             elif tp in [Primitives.I32, Primitives.I64, Primitives.Byte, Primitives.Bool]:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
@@ -270,7 +268,7 @@ def interpret_program(program: Program):
                     size_of_primitive(Primitives.I64), "big")
             else:
                 report_error(
-                    f"assignment for this type {type_str(tp)} not defined", op.file, op.line)
+                    f"assignment for this type `{type_str(tp)}` not defined", op.file, op.line)
 
             ip += 1
 

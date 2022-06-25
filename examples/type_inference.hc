@@ -1,5 +1,5 @@
-a:=5
-b:=2.5
+a := 5
+b := 2.5
 
 print a*b
 print '\n'
