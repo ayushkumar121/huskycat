@@ -244,6 +244,7 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
             report_error(
                 f"no character inside character brackets", file, line)
 
+    # Match characters
     else:
         # Match variables
         op_index, p_index = find_scope_with_symbol(word, program, func_index)
@@ -268,7 +269,7 @@ def parse_expression(exp: str, program: Program, func_index: int, file: str, lin
     for i, ch in enumerate(exp):
 
         # Matching operators
-        if ch in "=+-/*%()!&^|<>[]":
+        if ch in "=+-/*%()!&^|<>":
             if word != "":
                 eval, type = parse_word(word, program, func_index, file, line)
 
