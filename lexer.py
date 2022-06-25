@@ -30,7 +30,7 @@ def lex_source(file_path) -> List[Token]:
                 continue
 
             #  Matching Declaration
-            elif re.fullmatch("[a-zA-Z][a-zA-Z0-9_]*\s*:\^?[a-zA-Z][a-zA-Z0-9]*", line):
+            elif re.fullmatch("[a-zA-Z0-9_]+\s*:\^?[a-zA-Z0-9]+", line):
                 lside_tks = re.split(":", line)
                 tokens.append(Token(lside_tks[0].strip(), file_path, line_num))
 
@@ -41,7 +41,7 @@ def lex_source(file_path) -> List[Token]:
                         Token(lside_tks[1].strip(), file_path, line_num))
 
             #  Matching Assignments
-            elif re.fullmatch("\^?[a-zA-Z][a-zA-Z0-9_]*\s*:?(\^?[a-zA-Z][a-zA-Z0-9]*)?\s*=.*", line):
+            elif re.fullmatch("\^?[a-zA-Z0-9_]+\s*:?(\^?[a-zA-Z0-9]+)?\s*=.*", line):
                 tks = re.split("=", line)
 
                 if len(tks) != 2:

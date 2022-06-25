@@ -6,7 +6,7 @@ from typing import List, Tuple
 from lexer import Token, lex_source
 
 from misc import not_implemented, operator_list, report_error
-from static_types import FuncType, Primitives, TypedPtr, Types, size_of_primitive
+from static_types import FuncCall, FuncType, Primitives, TypedPtr, Types, size_of_primitive
 
 
 class OpType(Enum):
@@ -37,6 +37,9 @@ class OpType(Enum):
     # Print intrinstic prints whatever is at the top of compile time stack
     OpPrint = auto()
 
+    # # Calls a function
+    # OpCall = auto()
+
 
 @dataclass
 class Operation:
@@ -64,7 +67,7 @@ class Program:
 def find_scope_with_symbol(symbol: str, program: Program, func_index: int) -> tuple[int, int]:
     ops = program.operations[::-1] if func_index == - \
         1 else program.funcs[func_index].operations[::-1]
-    
+
     l = len(ops)
 
     skip = False
@@ -244,7 +247,27 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
             report_error(
                 f"no character inside character brackets", file, line)
 
-    # Match characters
+    # Match function calls
+    elif re.fullmatch("[a-zA-Z0-9_]+\[.*\]", word):
+        tokens = re.findall("([a-zA-Z0-9_]+)\[(.*)\]", word).pop()
+
+        op_index, p_index = find_scope_with_symbol(
+            tokens[0], program, func_index)
+        if op_index != -1:
+            intokens = re.findall(
+                "([a-z][a-zA-Z0-9=+\-/*%()!&^|<>\[\]]*)\s*(?:,|$)", tokens[1])
+            oprands = []
+            types = []
+            
+            for i in intokens:
+                eval_stack, tps = parse_expression(
+                    i, program, func_index, file, line)
+                oprands.append(eval_stack)
+                types.append(tps)
+
+            return word, FuncCall(func=tokens[0], oprands=oprands, types=types)
+
+    # Match variables
     else:
         # Match variables
         op_index, p_index = find_scope_with_symbol(word, program, func_index)
@@ -255,8 +278,8 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
             else:
                 tp = program.funcs[func_index].operations[op_index].types[p_index]
             return word, tp
-        else:
-            report_error(f"unrecognised word in expression `{word}`", file, line)
+
+    report_error(f"unrecognised word in expression `{word}`", file, line)
 
 
 def parse_expression(exp: str, program: Program, func_index: int, file: str, line: int) -> tuple[List[int | str], List[Types]]:
@@ -265,11 +288,20 @@ def parse_expression(exp: str, program: Program, func_index: int, file: str, lin
 
     word = ""
     operator = ""
+    skip = False
 
     for i, ch in enumerate(exp):
 
         # Matching operators
-        if ch in "=+-/*%()!&^|<>":
+        if ch == "[":
+            word = word + ch
+            skip = True
+
+        elif ch == "]":
+            word = word + ch
+            skip = False
+
+        elif not skip and ch in "=+-/*%()!&^|<>":
             if word != "":
                 eval, type = parse_word(word, program, func_index, file, line)
 
@@ -578,19 +610,20 @@ def parse_program_from_file(file_path: str) -> Program:
                     report_error("expected expression after `=`",
                                  token.file, token.line)
                 elif token.word == "func":
-                    vars, tp = parse_functype(
+                    vars, exp_type = parse_functype(
                         tokens, state, token.file, token.line)
 
                     func_index = len(program.funcs)
                     skip_scope = False
-                    program.funcs.append(Function(type=tp, operations=[]))
+                    program.funcs.append(
+                        Function(type=exp_type, operations=[]))
 
                     program.operations.append(
                         Operation(OpType.OpPush, token.file,
-                                  token.line, [func_index], [tp]))
+                                  token.line, [func_index], [exp_type]))
 
                     program.funcs[func_index].operations.append(
-                        Operation(OpType.OpBeginScope, token.file, token.line, [0] + vars, [Primitives.Untyped] + tp.ins))
+                        Operation(OpType.OpBeginScope, token.file, token.line, [0] + vars, [Primitives.Untyped] + exp_type.ins))
 
                     consume_token(tokens, state)
                 else:

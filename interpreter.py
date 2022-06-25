@@ -3,7 +3,7 @@ import struct
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Program
-from static_types import Primitives, TypedPtr, Types, type_str, size_of_primitive
+from static_types import FuncType, Primitives, TypedPtr, Types, type_str, size_of_primitive
 from typechecker import apply_op_binary_on_types, apply_op_uinary_on_types
 
 
@@ -172,6 +172,10 @@ def interpret_program(program: Program):
                 elif type(tp) == TypedPtr:
                     vars.append(Var(var, tp, size_of_primitive(Primitives.I64),
                                     bytearray(size_of_primitive(Primitives.I64))))
+                
+                elif type(tp) == FuncType:
+                    vars.append(Var(var, tp, size_of_primitive(Primitives.I64),
+                                    bytearray(size_of_primitive(Primitives.I64))))
                 else:
                     report_error(
                         f"definition of type {type_str(tp)} not defined", op.file, op.line)
@@ -264,6 +268,10 @@ def interpret_program(program: Program):
                     struct.pack("d", value_stack.pop()))
 
             elif type(tp) == TypedPtr:
+                scopes[i][j].value = int(value_stack.pop()).to_bytes(
+                    size_of_primitive(Primitives.I64), "big")
+
+            elif type(tp) == FuncType:
                 scopes[i][j].value = int(value_stack.pop()).to_bytes(
                     size_of_primitive(Primitives.I64), "big")
             else:

@@ -2,7 +2,7 @@ from pprint import pprint
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import OpType, Operation, Program
-from static_types import Primitives, TypedPtr, Types, type_str
+from static_types import FuncCall, Primitives, TypedPtr, Types, type_str
 
 
 def find_scope_with_symbol(symbol: str, operations: Operation) -> tuple[int, int]:
@@ -111,7 +111,11 @@ def typecheck_program(program: Program):
 
     assert len(OpType) == 9, "Exhaustive handling of operations"
 
-    for ip, op in enumerate(program.operations):
+    ops = program.operations
+    for func in program.funcs:
+        ops += func.operations
+
+    for ip, op in enumerate(ops):
 
         if op.type == OpType.OpBeginScope:
             pass
@@ -131,6 +135,12 @@ def typecheck_program(program: Program):
                     k, j = find_scope_with_symbol(val, program.operations[:ip])
 
                     tp = program.operations[k].types[j]
+                    op.types[len(op.oprands) - (i+1)] = tp
+
+                if type(tp) == FuncCall:
+                    k, j = find_scope_with_symbol(tp.func, program.operations[:ip])
+
+                    tp = program.operations[k].types[j].outs[:].pop()
                     op.types[len(op.oprands) - (i+1)] = tp
 
                 value_stack.append(val)

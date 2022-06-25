@@ -25,8 +25,14 @@ class FuncType():
     ins: List[Primitives | TypedPtr]
     outs: List[Primitives | TypedPtr]
 
+@dataclass
+class FuncCall():
+    func: str
+    oprands: List[int|str]
+    types: List[Primitives | TypedPtr | FuncType]
 
-Types = Primitives | TypedPtr | FuncType
+
+Types = Primitives | TypedPtr | FuncType | FuncCall
 
 
 def size_of_primitive(primitive: Primitives) -> int:
@@ -62,4 +68,9 @@ def type_str(tp: Types) -> str:
         outs = ",".join([type_str(t) for t in tp.outs])
 
         return f"func({ins}) -> ({outs})"
+    elif type(tp) == FuncCall:
+        ins = ",".join([type_str(t) for t in tp.types])
+
+        return f"{tp.func}({ins})"
+     
     return "unknown"
