@@ -256,7 +256,7 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
             tokens[0], program, func_index)
         if op_index != -1:
             intokens = re.findall(
-                "([a-z][a-zA-Z0-9=+\-/*%()!&^|<>\[\]]*)\s*(?:,|$)", tokens[1])
+                "([a-zA-Z0-9=+\-/*%()!&^|<>\[\]]+)\s*(?:,|$)", tokens[1])
             oprands = []
             types = []
 
