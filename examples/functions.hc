@@ -7,5 +7,5 @@ sub := add
 a:=5
 b:=6
 
-print add[a, b, 6-1]+1
+print sub[a, b, 6-1]+1
 print '\n'
