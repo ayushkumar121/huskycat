@@ -194,10 +194,7 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
         ins = ",".join(
             [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
 
-        c_code += f"{type_str(out)} func_{i}({ins})"
-        c_code += "\n{\n"
-        c_code += compile_operations(func)
-        c_code += "}\n"
+        c_code += f"{type_str(out)} func_{i}({ins});\n"
 
     c_code += "ptr funcs[]={\n"
     for i, func in enumerate(program.funcs):
@@ -209,5 +206,15 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
     c_code += """return 0;
 }
 """
+
+    for i, func in enumerate(program.funcs):
+        out = func.signature.outs[:].pop()
+        ins = ",".join(
+            [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
+
+        c_code += f"{type_str(out)} func_{i}({ins})"
+        c_code += "\n{\n"
+        c_code += compile_operations(func)
+        c_code += "}\n"
 
     return c_code

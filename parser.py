@@ -65,22 +65,26 @@ class Program:
     operations: List[Operation]
 
 
-def find_scope_with_symbol(symbol: str, program: Program, func_index: int) -> tuple[int, int]:
+def find_scope_with_symbol(symbol: str, program: Program, func_index: int) -> tuple[Operation|None, int]:
+    # Local Scope
     ops = program.operations[::-1] if func_index == - \
         1 else program.funcs[func_index].operations[::-1]
 
-    l = len(ops)
-
     skip = False
-    for i, op in enumerate(ops):
+    for op in ops:
         if op.type == OpType.OpBeginScope:
             if not skip and symbol in op.oprands:
-                return l-(i+1), op.oprands.index(symbol)
+                return op, op.oprands.index(symbol)
             skip = False
         elif op.type == OpType.OpEndScope:
             skip = True
 
-    return -1, -1
+    # Global Scope 
+    global_scope = program.operations[0]
+    if symbol in global_scope.oprands:
+        return global_scope, global_scope.oprands.index(symbol)
+
+    return None, -1
 
 
 def find_local_scope(program: Program, func_index: int) -> int:
@@ -252,9 +256,10 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
     elif re.fullmatch("[a-zA-Z0-9_]+\[.*\]", word):
         tokens = re.findall("([a-zA-Z0-9_]+)\[(.*)\]", word).pop()
 
-        op_index, p_index = find_scope_with_symbol(
+        foundop, p_index = find_scope_with_symbol(
             tokens[0], program, func_index)
-        if op_index != -1:
+
+        if foundop != None:
             intokens = re.findall(
                 "([a-zA-Z0-9=+\-/*%()!&^|<>\[\]]+)\s*(?:,|$)", tokens[1])
             oprands = []
@@ -267,17 +272,19 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
                 types.append(tps)
 
             return word, FuncCall(name=tokens[0], signature=FuncType(ins=[], outs=[]), oprands=oprands, types=types)
+        else:
+            report_error(f"unrecognised function call `{word}`", file, line)\
 
     # Match variables
     else:
         # Match variables
-        op_index, p_index = find_scope_with_symbol(word, program, func_index)
-        if op_index != -1:
+        foundop, p_index = find_scope_with_symbol(word, program, func_index)
+        if foundop != None:
             tp = Primitives.Unknown
             if func_index == -1:
-                tp = program.operations[op_index].types[p_index]
+                tp = foundop.types[p_index]
             else:
-                tp = program.funcs[func_index].operations[op_index].types[p_index]
+                tp = foundop.types[p_index]
             return word, tp
 
     report_error(f"unrecognised word in expression `{word}`", file, line)
@@ -586,9 +593,9 @@ def parse_program_from_file(file_path: str) -> Program:
                     word = word[1:]
                     deref = True
 
-                ip, opi = find_scope_with_symbol(word, program, func_index)
+                foundop, opi = find_scope_with_symbol(word, program, func_index)
 
-                if ip == -1:
+                if foundop == None:
                     if next_token.word != ":":
                         report_error(f"Symbol `{word}` used before declaration",
                                      token.file, token.line)

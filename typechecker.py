@@ -6,19 +6,21 @@ from parser import Function, OpType, Operation, Program
 from static_types import FuncCall, Primitives, TypedPtr, Types, type_str
 
 
-def find_scope_with_symbol(symbol: str, operations: Operation) -> tuple[int, int]:
-    l = len(operations)
-
+def find_scope_with_symbol(symbol: str, operations: Operation, global_scope: Operation) -> tuple[Operation, int]:
     skip = False
-    for i, op in enumerate(operations[::-1]):
+    for op in operations[::-1]:
         if op.type == OpType.OpBeginScope:
             if not skip and symbol in op.oprands:
-                return l-(i+1), op.oprands.index(symbol)
+                return op, op.oprands.index(symbol)
             skip = False
         elif op.type == OpType.OpEndScope:
             skip = True
 
-    return -1, -1
+    # Global Scope
+    if symbol in global_scope.oprands:
+        return global_scope, global_scope.oprands.index(symbol)
+
+    return None, -1
 
 
 def apply_op_binary_on_types(a: Types, b: Types, op: str, file: str, line: int) -> Types:
@@ -105,13 +107,15 @@ def evaluate_stack(eval_stack: List[int | str],
             f"unable to type evaluate following stack {eval_stack}", file, line)
     return [0], type_stack
 
+
 def typecheck_program(program: Program):
+    typecheck_operations(program, program.operations[0])
+
     for func in program.funcs:
-        typecheck_operations(func)
+        typecheck_operations(func, program.operations[0])
 
-    typecheck_operations(program)
 
-def typecheck_operations(program: Program | Function):
+def typecheck_operations(program: Program | Function, global_scope: Operation):
     type_stack: List[Types] = []
     value_stack: List[int | str] = []
 
@@ -134,20 +138,21 @@ def typecheck_operations(program: Program | Function):
                 tp = op.types[len(op.oprands) - (i+1)]
 
                 if tp == Primitives.Untyped:
-                    k, j = find_scope_with_symbol(val, program.operations[:ip])
+                    foundop, j = find_scope_with_symbol(
+                        val, program.operations[:ip], global_scope)
 
-                    tp = program.operations[k].types[j]
+                    tp = foundop.types[j]
                     op.types[len(op.oprands) - (i+1)] = tp
 
                 if type(tp) == FuncCall:
-                    k, j = find_scope_with_symbol(
-                        tp.name, program.operations[:ip])
+                    foundop, j = find_scope_with_symbol(
+                        tp.name, program.operations[:ip], global_scope)
 
-                    tp = program.operations[k].types[j].outs[:].pop()
+                    tp = foundop.types[j].outs[:].pop()
                     op.types[len(op.oprands) - (i+1)
-                             ].signature = program.operations[k].types[j]
+                             ].signature = foundop.types[j]
 
-                    expected = program.operations[k].types[j].ins
+                    expected = foundop.types[j].ins
                     found_stack = []
 
                     oprands = op.types[len(op.oprands) - (i+1)].oprands
@@ -161,10 +166,10 @@ def typecheck_operations(program: Program | Function):
                         v = vals.pop()
                         t = tps.pop()
                         if t == Primitives.Untyped:
-                            ipr, oprr = find_scope_with_symbol(
-                                opr[-1], program.operations[:ip])
-                                
-                            t = program.operations[ipr].types[oprr]
+                            foundop, oprr = find_scope_with_symbol(
+                                opr[-1], program.operations[:ip], global_scope)
+
+                            t = foundop.types[oprr]
 
                         found_stack.append(t)
 
@@ -202,9 +207,10 @@ def typecheck_operations(program: Program | Function):
             found = type_stack.pop()
 
             if tp == Primitives.Untyped:
-                i, j = find_scope_with_symbol(symbol, program.operations[:ip])
+                foundop, j = find_scope_with_symbol(
+                    symbol, program.operations[:ip], global_scope)
                 op.types[-1] = found
-                program.operations[i].types[j] = found
+                foundop.types[j] = found
             elif tp != found:
                 report_error(
                     f"mismatch type on assignment, expected `{type_str(tp)}` found `{type_str(found)}`", op.file, op.line)
