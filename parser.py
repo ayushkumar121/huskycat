@@ -263,7 +263,7 @@ def parse_word(word: str, program: Program, func_index: int, file: str, line: in
             for i in intokens:
                 eval_stack, tps = parse_expression(
                     i, program, func_index, file, line)
-                oprands.append(eval_stack)
+                oprands.append(eval_stack[::-1])
                 types.append(tps)
 
             return word, FuncCall(name=tokens[0], signature=FuncType(ins=[], outs=[]), oprands=oprands, types=types)
