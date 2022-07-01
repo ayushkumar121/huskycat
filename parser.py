@@ -618,6 +618,11 @@ def parse_program_from_file(file_path: str) -> Program:
                 else:
                     tp = program.operations[ip].types[opi]
 
+                next_token = peek_token(tokens, state)
+                if next_token.word == ":":
+                     report_error(f"cannot redefine symbol `{word}`",
+                                 token.file, token.line)
+
                 consume_token(tokens, state)
                 token = consume_token(tokens, state)
 

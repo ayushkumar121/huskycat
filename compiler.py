@@ -201,7 +201,7 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
 
     c_code += "ptr funcs[]={\n"
     for i, func in enumerate(program.funcs):
-        c_code += f"(ptr)func_{i}\n"
+        c_code += f"(ptr)func_{i},\n"
     c_code += "};\n"
 
     c_code += "int main() {\n"
