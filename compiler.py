@@ -220,7 +220,7 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
         else:
             print(var)
             report_error(
-                f"type `{tp}` not defined for compilation", op.file, op.line)
+                f"type `{tp}` not defined for compilation", global_scope.file, global_scope.line)
 
     for i, func in enumerate(program.funcs):
         out, ins = compile_func_signature(func)
