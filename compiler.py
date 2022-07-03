@@ -1,8 +1,38 @@
 from calendar import c
-from typing import List
+from pprint import pprint
+from typing import List, Tuple
 from misc import report_error
 from parser import Function, OpType, Program
 from static_types import FuncCall, FuncType, Primitives, TypedPtr, Types, type_str
+
+
+def husky_to_c_type(tp: Types) -> str:
+    if tp == Primitives.I32:
+        return "i32"
+    elif tp == Primitives.I64:
+        return "i64"
+    elif tp == Primitives.F32:
+        return "f32"
+    elif tp == Primitives.F64:
+        return "f64"
+    elif tp == Primitives.Bool:
+        return "bool"
+    elif tp == Primitives.Byte:
+        return "byte"
+    elif type(tp) == TypedPtr:
+        return "ptr"
+    elif type(tp) == FuncType:
+        return "ptr"
+
+    return "unkown"
+
+
+def compile_func_signature(func: Function) -> Tuple[str, str]:
+    out = type_str(func.signature.outs[:].pop())
+    ins = ",".join(
+            [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
+
+    return (out, ins)
 
 
 def compile_expression(value_stack: List, type_stack: List[Types]) -> str:
@@ -59,25 +89,13 @@ def compile_operations(program: Program | Function) -> str:
                 var = op.oprands.pop()
                 tp = op.types.pop()
 
-                if tp == Primitives.I32:
-                    c_code += f"i32 {var};\n"
-                elif tp == Primitives.I64:
-                    c_code += f"i64 {var};\n"
-                elif tp == Primitives.F32:
-                    c_code += f"f32 {var};\n"
-                elif tp == Primitives.F64:
-                    c_code += f"f64 {var};\n"
-                elif tp == Primitives.Bool:
-                    c_code += f"bool {var};\n"
-                elif tp == Primitives.Byte:
-                    c_code += f"byte {var};\n"
-                elif type(tp) == TypedPtr:
-                    c_code += f"ptr {var};\n"
-                elif type(tp) == FuncType:
-                    c_code += f"ptr {var};\n"
+                c_type = husky_to_c_type(tp)
+
+                if c_type != "unkown":
+                    c_code += f"{c_type} {var};\n"
                 else:
                     report_error(
-                        f"type `{type_str(tp)}` not defined for compilation", op.file, op.line)
+                        f"type `{tp}` not defined for compilation", op.file, op.line)
 
         elif op.type == OpType.OpEndScope:
             c_code += "}\n"
@@ -189,12 +207,24 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
 """
     c_code += f"byte global_memory[{program.memory_capacity}];\n"
 
-    for i, func in enumerate(program.funcs):
-        out = func.signature.outs[:].pop()
-        ins = ",".join(
-            [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
+    global_scope = program.operations[0]
 
-        c_code += f"{type_str(out)} func_{i}({ins});\n"
+    while len(global_scope.oprands[1:]) > 0:
+        var = global_scope.oprands.pop()
+        tp = global_scope.types.pop()
+
+        c_type = husky_to_c_type(tp)
+
+        if c_type != "unkown":
+            c_code += f"{c_type} {var};\n"
+        else:
+            print(var)
+            report_error(
+                f"type `{tp}` not defined for compilation", op.file, op.line)
+
+    for i, func in enumerate(program.funcs):
+        out, ins = compile_func_signature(func)
+        c_code += f"{out} func_{i}({ins});\n"
 
     c_code += "ptr funcs[]={\n"
     for i, func in enumerate(program.funcs):
@@ -202,17 +232,16 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
     c_code += "};\n"
 
     c_code += "int main() {\n"
+    program.operations = program.operations[1:-1]
     c_code += compile_operations(program)
     c_code += """return 0;
 }
 """
 
     for i, func in enumerate(program.funcs):
-        out = func.signature.outs[:].pop()
-        ins = ",".join(
-            [f"{type_str(opr)} {func.operations[0].oprands[i+1]}" for i, opr in enumerate(func.signature.ins)])
+        out, ins = compile_func_signature(func)
 
-        c_code += f"{type_str(out)} func_{i}({ins})"
+        c_code += f"{out} func_{i}({ins})"
         c_code += "\n{\n"
         c_code += compile_operations(func)
         c_code += "}\n"
