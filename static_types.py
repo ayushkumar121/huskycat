@@ -25,11 +25,12 @@ class FuncType():
     ins: List[Primitives | TypedPtr]
     outs: List[Primitives | TypedPtr]
 
+
 @dataclass
 class FuncCall():
     name: str
     signature: FuncType
-    oprands: List[List[int|str]]
+    oprands: List[List[int | str]]
     types: List[List[Primitives | TypedPtr | FuncType]]
 
 
@@ -71,5 +72,5 @@ def type_str(tp: Types) -> str:
         return f"func({ins}) -> ({outs})"
     elif type(tp) == FuncCall:
         return f"{tp.name}()"
-     
+
     return "unknown"

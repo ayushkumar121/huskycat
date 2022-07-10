@@ -208,7 +208,6 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
     c_code += f"byte global_memory[{program.memory_capacity}];\n"
 
     global_scope = program.operations[0]
-
     while len(global_scope.oprands[1:]) > 0:
         var = global_scope.oprands.pop()
         tp = global_scope.types.pop()
@@ -218,7 +217,6 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
         if c_type != "unkown":
             c_code += f"{c_type} {var};\n"
         else:
-            print(var)
             report_error(
                 f"type `{tp}` not defined for compilation", global_scope.file, global_scope.line)
 
@@ -231,12 +229,14 @@ void print_ptr(const char * type, ptr a) {printf(\"^%s(%lld)\",type, a);}
         c_code += f"(ptr)func_{i},\n"
     c_code += "};\n"
 
-    c_code += "int main() {\n"
+    c_code += "int main()\n"
+    c_code += "{\n"
+    
     program.operations = program.operations[1:-1]
     c_code += compile_operations(program)
-    c_code += """return 0;
-}
-"""
+    
+    c_code += "return 0;\n"
+    c_code += "}\n";
 
     for i, func in enumerate(program.funcs):
         out, ins = compile_func_signature(func)

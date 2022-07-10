@@ -1,5 +1,3 @@
-from pprint import pprint
-import re
 from typing import List
 from misc import operator_predence, operator_list, binary_operators, report_error, unary_operators
 from parser import Function, OpType, Operation, Program
